@@ -16,5 +16,12 @@ export const routes: Routes = [
       ),
     canActivate: [sessionGuard],
   },
+  {
+    path: 'teacher',
+    loadComponent: () =>
+      import('./features/teacher/teacher.component').then(
+        (m) => m.TeacherComponent
+      ),
+  },
   { path: '**', redirectTo: 'join' },
 ];

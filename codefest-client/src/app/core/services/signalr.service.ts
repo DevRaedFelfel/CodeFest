@@ -18,6 +18,14 @@ export class SignalrService {
   // Connection state
   connected$ = new BehaviorSubject<boolean>(false);
 
+  // Teacher events
+  studentJoined$ = new Subject<any>();
+  studentDisconnected$ = new Subject<number>();
+  submissionResult$ = new Subject<any>();
+  activityLogged$ = new Subject<any>();
+  sessionStatusChanged$ = new Subject<string>();
+  hintRequested$ = new Subject<any>();
+
   // Student events
   sessionStarted$ = new Subject<Challenge>();
   sessionPaused$ = new Subject<void>();
@@ -90,6 +98,22 @@ export class SignalrService {
       this.leaderboardUpdated$.next(entries)
     );
     on('Error', (msg: string) => this.error$.next(msg));
+
+    // Teacher handlers
+    on('StudentJoined', (student: any) => this.studentJoined$.next(student));
+    on('StudentDisconnected', (studentId: number) =>
+      this.studentDisconnected$.next(studentId)
+    );
+    on('SubmissionResult', (result: any) =>
+      this.submissionResult$.next(result)
+    );
+    on('ActivityLogged', (activity: any) =>
+      this.activityLogged$.next(activity)
+    );
+    on('SessionStatusChanged', (status: string) =>
+      this.sessionStatusChanged$.next(status)
+    );
+    on('HintRequested', (data: any) => this.hintRequested$.next(data));
   }
 
   async joinSession(
@@ -141,6 +165,58 @@ export class SignalrService {
       'RequestHint',
       sessionCode,
       challengeId
+    );
+  }
+
+  // Teacher methods
+  async createSession(
+    sessionName: string,
+    challengeIds: number[]
+  ): Promise<any> {
+    return this.hubConnection.invoke(
+      'CreateSession',
+      sessionName,
+      challengeIds
+    );
+  }
+
+  async startSession(sessionCode: string): Promise<void> {
+    return this.hubConnection.invoke('StartSession', sessionCode);
+  }
+
+  async pauseSession(sessionCode: string): Promise<void> {
+    return this.hubConnection.invoke('PauseSession', sessionCode);
+  }
+
+  async resumeSession(sessionCode: string): Promise<void> {
+    return this.hubConnection.invoke('ResumeSession', sessionCode);
+  }
+
+  async endSession(sessionCode: string): Promise<void> {
+    return this.hubConnection.invoke('EndSession', sessionCode);
+  }
+
+  async pushHint(
+    sessionCode: string,
+    challengeId: number,
+    hint: string
+  ): Promise<void> {
+    return this.hubConnection.invoke(
+      'PushHint',
+      sessionCode,
+      challengeId,
+      hint
+    );
+  }
+
+  async broadcastMessage(
+    sessionCode: string,
+    message: string
+  ): Promise<void> {
+    return this.hubConnection.invoke(
+      'BroadcastMessage',
+      sessionCode,
+      message
     );
   }
 

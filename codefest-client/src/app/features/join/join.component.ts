@@ -206,6 +206,8 @@ export class JoinComponent {
         this.displayName.trim()
       );
 
+      console.log('JoinSession result:', JSON.stringify(result, null, 2));
+
       // Map session status string to enum
       const statusMap: Record<string, SessionStatus> = {
         Lobby: SessionStatus.Lobby,
