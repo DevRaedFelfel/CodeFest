@@ -7,7 +7,7 @@ services:
       - "5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=codefest;Username=codefest;Password=${POSTGRES_PASSWORD}
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=codefest;Username=postgres;Password=${POSTGRES_PASSWORD}
       - ASPNETCORE_URLS=http://+:8080
     depends_on:
       postgres:
@@ -16,17 +16,17 @@ services:
       - codefest-net
 
   postgres:
-    image: postgres:16-alpine
+    image: exadel/compreface-postgres-db:1.2.0
     environment:
       POSTGRES_DB: codefest
-      POSTGRES_USER: codefest
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U codefest -d codefest"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d codefest"]
       interval: 10s
       timeout: 5s
       retries: 5
