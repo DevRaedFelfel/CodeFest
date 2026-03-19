@@ -135,12 +135,45 @@ public class CodeFestHub : Hub
             });
 
             var session = await _sessionService.GetByCodeAsync(sessionCode);
+
+            // If session is active, send the current challenge
+            object? currentChallenge = null;
+            var totalChallenges = session?.ChallengeIds?.Count ?? 0;
+            if (session?.Status == SessionStatus.Active && session.ChallengeIds?.Count > 0)
+            {
+                var challengeIndex = student.CurrentChallengeIndex;
+                if (challengeIndex < session.ChallengeIds.Count)
+                {
+                    var challenge = await _challengeService.GetByIdAsync(session.ChallengeIds[challengeIndex]);
+                    if (challenge != null)
+                    {
+                        currentChallenge = new
+                        {
+                            challenge.Id,
+                            challenge.Title,
+                            challenge.Description,
+                            challenge.StarterCode,
+                            challenge.Order,
+                            challenge.Points,
+                            challenge.TimeLimitSeconds,
+                            Difficulty = challenge.Difficulty.ToString(),
+                            TestCases = challenge.TestCases
+                                .Where(t => !t.IsHidden)
+                                .Select(t => new { t.Id, t.ChallengeId, t.Input, t.ExpectedOutput, t.IsHidden, t.Order, t.Description }),
+                            challenge.PatternChecks
+                        };
+                    }
+                }
+            }
+
             return new
             {
                 StudentId = student.Id,
                 SessionId = student.SessionId,
                 SessionStatus = session?.Status.ToString(),
-                SessionName = session?.Name
+                SessionName = session?.Name,
+                TotalChallenges = totalChallenges,
+                CurrentChallenge = currentChallenge
             };
         }
         catch (InvalidOperationException ex)

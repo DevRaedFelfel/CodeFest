@@ -206,14 +206,24 @@ export class JoinComponent {
         this.displayName.trim()
       );
 
+      // Map session status string to enum
+      const statusMap: Record<string, SessionStatus> = {
+        Lobby: SessionStatus.Lobby,
+        Active: SessionStatus.Active,
+        Paused: SessionStatus.Paused,
+        Ended: SessionStatus.Ended,
+      };
+      const status =
+        statusMap[result.sessionStatus] ?? SessionStatus.Lobby;
+
       // Store session info
       this.session.setJoinInfo({
         sessionCode: this.sessionCode,
-        sessionName: result.sessionName ?? result.name ?? '',
-        studentId: result.studentId ?? result.id,
+        sessionName: result.sessionName ?? '',
+        studentId: result.studentId,
         displayName: this.displayName.trim(),
         totalChallenges: result.totalChallenges ?? 0,
-        status: result.status as SessionStatus,
+        status,
         currentChallenge: result.currentChallenge ?? undefined,
       });
 
