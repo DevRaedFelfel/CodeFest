@@ -1,0 +1,216 @@
+[
+  {
+    "title": "Hello CodeFest!",
+    "description": "Write a console app that reads a name from input and prints:\n`Hello, {name}! Welcome to CodeFest!`",
+    "starterCode": "using System;\n\nConsole.Write(\"Enter your name: \");\nstring name = Console.ReadLine();\n// Print the greeting here\n",
+    "order": 1,
+    "points": 50,
+    "timeLimitSeconds": 120,
+    "difficulty": "Easy",
+    "testCases": [
+      {
+        "input": "Ali",
+        "expectedOutput": "Hello, Ali! Welcome to CodeFest!",
+        "isHidden": false,
+        "description": "Basic name input"
+      },
+      {
+        "input": "Gaza Developer",
+        "expectedOutput": "Hello, Gaza Developer! Welcome to CodeFest!",
+        "isHidden": true,
+        "description": "Name with space"
+      }
+    ],
+    "patternChecks": []
+  },
+  {
+    "title": "Sum Machine",
+    "description": "Read an integer `n` from input, then read `n` numbers (one per line), and print their sum.\n\nExample input:\n```\n3\n10\n20\n30\n```\nExpected output: `60`",
+    "starterCode": "using System;\n\nint n = int.Parse(Console.ReadLine());\n// Read n numbers and print their sum\n",
+    "order": 2,
+    "points": 100,
+    "timeLimitSeconds": 180,
+    "difficulty": "Easy",
+    "testCases": [
+      {
+        "input": "3\n10\n20\n30",
+        "expectedOutput": "60",
+        "isHidden": false,
+        "description": "Three positive numbers"
+      },
+      {
+        "input": "1\n42",
+        "expectedOutput": "42",
+        "isHidden": false,
+        "description": "Single number"
+      },
+      {
+        "input": "4\n-5\n10\n-3\n8",
+        "expectedOutput": "10",
+        "isHidden": true,
+        "description": "Mix of positive and negative"
+      },
+      {
+        "input": "0",
+        "expectedOutput": "0",
+        "isHidden": true,
+        "description": "Zero numbers"
+      }
+    ],
+    "patternChecks": [
+      {
+        "type": "MustContain",
+        "pattern": "for",
+        "isRegex": false,
+        "failureMessage": "You must use a for loop to read the numbers."
+      }
+    ]
+  },
+  {
+    "title": "Reverse Engineer",
+    "description": "Read a string from input and print it reversed.\n\n**Rules:** You must NOT use `.Reverse()` or `Array.Reverse()`. Build the reversed string yourself using a loop.\n\nExample input: `hello` → Output: `olleh`",
+    "starterCode": "using System;\n\nstring input = Console.ReadLine();\n// Reverse it without using .Reverse() and print\n",
+    "order": 3,
+    "points": 150,
+    "timeLimitSeconds": 300,
+    "difficulty": "Medium",
+    "testCases": [
+      {
+        "input": "hello",
+        "expectedOutput": "olleh",
+        "isHidden": false,
+        "description": "Simple word"
+      },
+      {
+        "input": "Gaza",
+        "expectedOutput": "azaG",
+        "isHidden": false,
+        "description": "Mixed case"
+      },
+      {
+        "input": "a",
+        "expectedOutput": "a",
+        "isHidden": true,
+        "description": "Single character"
+      },
+      {
+        "input": "12345",
+        "expectedOutput": "54321",
+        "isHidden": true,
+        "description": "Digits"
+      }
+    ],
+    "patternChecks": [
+      {
+        "type": "MustNotContain",
+        "pattern": ".Reverse()",
+        "isRegex": false,
+        "failureMessage": "You cannot use .Reverse() — build the reversed string yourself!"
+      },
+      {
+        "type": "MustNotContain",
+        "pattern": "Array.Reverse",
+        "isRegex": false,
+        "failureMessage": "You cannot use Array.Reverse() — build the reversed string yourself!"
+      },
+      {
+        "type": "MustContain",
+        "pattern": "for",
+        "isRegex": false,
+        "failureMessage": "You must use a loop to reverse the string."
+      }
+    ]
+  },
+  {
+    "title": "FizzBuzz Champion",
+    "description": "Read an integer `n` from input. For each number from 1 to `n`, print:\n- `FizzBuzz` if divisible by both 3 and 5\n- `Fizz` if divisible by 3 only\n- `Buzz` if divisible by 5 only\n- The number itself otherwise\n\nEach value on its own line.",
+    "starterCode": "using System;\n\nint n = int.Parse(Console.ReadLine());\n// Print FizzBuzz from 1 to n\n",
+    "order": 4,
+    "points": 200,
+    "timeLimitSeconds": 300,
+    "difficulty": "Medium",
+    "testCases": [
+      {
+        "input": "5",
+        "expectedOutput": "1\n2\nFizz\n4\nBuzz",
+        "isHidden": false,
+        "description": "First 5 numbers"
+      },
+      {
+        "input": "15",
+        "expectedOutput": "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz",
+        "isHidden": true,
+        "description": "Up to 15 — includes FizzBuzz"
+      },
+      {
+        "input": "1",
+        "expectedOutput": "1",
+        "isHidden": true,
+        "description": "Edge case: single number"
+      }
+    ],
+    "patternChecks": [
+      {
+        "type": "MustContain",
+        "pattern": "if",
+        "isRegex": false,
+        "failureMessage": "You need to use conditional statements (if/else)."
+      },
+      {
+        "type": "MustContain",
+        "pattern": "%",
+        "isRegex": false,
+        "failureMessage": "Hint: use the modulo operator (%) to check divisibility."
+      }
+    ]
+  },
+  {
+    "title": "Star Pyramid (Boss Level)",
+    "description": "Read an integer `n` from input and print a centered pyramid of stars with `n` rows.\n\nExample for `n = 4`:\n```\n   *\n  ***\n *****\n*******\n```\n\n**Rules:** You must use nested loops. Each row has `(2 * row - 1)` stars, preceded by `(n - row)` spaces. No trailing spaces.",
+    "starterCode": "using System;\n\nint n = int.Parse(Console.ReadLine());\n// Print a centered star pyramid with n rows\n",
+    "order": 5,
+    "points": 300,
+    "timeLimitSeconds": 600,
+    "difficulty": "Boss",
+    "testCases": [
+      {
+        "input": "3",
+        "expectedOutput": "  *\n ***\n*****",
+        "isHidden": false,
+        "description": "3-row pyramid"
+      },
+      {
+        "input": "1",
+        "expectedOutput": "*",
+        "isHidden": false,
+        "description": "Single row"
+      },
+      {
+        "input": "5",
+        "expectedOutput": "    *\n   ***\n  *****\n *******\n*********",
+        "isHidden": true,
+        "description": "5-row pyramid"
+      }
+    ],
+    "patternChecks": [
+      {
+        "type": "MustContain",
+        "pattern": "for.*for",
+        "isRegex": true,
+        "failureMessage": "You must use nested loops (a for loop inside another for loop)."
+      },
+      {
+        "type": "MustNotContain",
+        "pattern": "PadLeft",
+        "isRegex": false,
+        "failureMessage": "Build the spacing yourself using a loop — don't use PadLeft()."
+      },
+      {
+        "type": "MustNotContain",
+        "pattern": "PadRight",
+        "isRegex": false,
+        "failureMessage": "Build the output yourself using loops — don't use PadRight()."
+      }
+    ]
+  }
+]

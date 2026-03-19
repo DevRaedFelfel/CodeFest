@@ -1,0 +1,31 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+## Node / Angular
+node_modules/
+dist/
+.angular/
+
+## Docker
+mysql-data/
+
+## Environment
+.env
+
+## OS
+Thumbs.db
+.DS_Store
+
+## IDE
+.idea/
+*.swp
+*.swo
+
+## Claude
+.claude/
