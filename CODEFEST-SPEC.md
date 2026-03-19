@@ -14,7 +14,7 @@ CodeFest is a real-time, gamified C# coding challenge platform for classroom use
 |-------|------------|
 | Backend API | .NET 8 Web API (full controllers) |
 | Real-time | SignalR |
-| Database | MySQL 8 (EF Core) |
+| Database | PostgreSQL (EF Core + Npgsql) |
 | Code Execution | Roslyn Scripting API (sandboxed) |
 | Student Frontend | Angular 17+ / CodeMirror 6 |
 | Teacher Dashboard | Angular 17+ (same app, `/teacher` route) |
@@ -28,10 +28,10 @@ CodeFest is a real-time, gamified C# coding challenge platform for classroom use
 │                  Docker Compose                      │
 │                                                      │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────┐ │
-│  │  .NET 8 API  │  │   MySQL 8    │  │  Angular   │ │
+│  │  .NET 8 API  │  │ PostgreSQL   │  │  Angular   │ │
 │  │  + SignalR    │──│              │  │  (nginx)   │ │
 │  │  + Roslyn     │  │              │  │            │ │
-│  │  Port: 5000   │  │  Port: 3306  │  │ Port: 80   │ │
+│  │  Port: 5050   │  │  Port: 5432  │  │ Port: 80   │ │
 │  └──────┬───────┘  └──────────────┘  └─────┬─────┘ │
 │         │          SignalR WebSocket         │       │
 │         └───────────────┬───────────────────┘       │
@@ -83,9 +83,9 @@ cd CodeFest.Api
 # Add required NuGet packages
 dotnet add package Microsoft.AspNetCore.SignalR
 dotnet add package Microsoft.EntityFrameworkCore
-dotnet add package Pomelo.EntityFrameworkCore.MySql
+dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
 dotnet add package Microsoft.EntityFrameworkCore.Design
-dotnet add package Microsoft.CodeAnalysis.CSharp.Scripting
+dotnet add package Microsoft.CodeAnalysis.CSharp
 
 # Back to root
 cd ~/codefest
@@ -137,38 +137,35 @@ cd ~/codefest
 
 ```yaml
 # docker-compose.yml
-version: '3.8'
-
 services:
   api:
     build:
-      context: ./CodeFest.Api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: CodeFest.Api/Dockerfile
     ports:
-      - "5000:8080"
+      - "5050:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=codefest;User=codefest;Password=${MYSQL_PASSWORD}
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=codefest;Username=postgres;Password=${POSTGRES_PASSWORD}
       - ASPNETCORE_URLS=http://+:8080
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     networks:
       - codefest-net
 
-  mysql:
-    image: mysql:8.0
+  postgres:
+    image: postgres:16-alpine
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: codefest
-      MYSQL_USER: codefest
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      POSTGRES_DB: codefest
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d codefest"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -187,33 +184,36 @@ services:
       - codefest-net
 
 volumes:
-  mysql-data:
+  pg-data:
 
 networks:
   codefest-net:
     driver: bridge
 ```
 
+> **Note:** If you already have a PostgreSQL image cached locally (e.g. from another project), you can replace `postgres:16-alpine` with that image to avoid downloading a new one.
+
 ```bash
 # .env file
-MYSQL_ROOT_PASSWORD=codefest_root_2024
-MYSQL_PASSWORD=codefest_pass_2024
+POSTGRES_PASSWORD=codefest_pass_2024
 ```
 
 ### 1.5 — API Dockerfile
 
 ```dockerfile
 # CodeFest.Api/Dockerfile
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# Uses alpine variants for smaller image size
+FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
 WORKDIR /src
-COPY *.csproj ./
-RUN dotnet restore
-COPY . .
-RUN dotnet publish -c Release -o /app/publish
+COPY CodeFest.Api/*.csproj ./CodeFest.Api/
+RUN dotnet restore CodeFest.Api/CodeFest.Api.csproj
+COPY CodeFest.Api/ ./CodeFest.Api/
+RUN dotnet publish CodeFest.Api/CodeFest.Api.csproj -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine
 WORKDIR /app
 COPY --from=build /app/publish .
+COPY seed-data/ ./seed-data/
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "CodeFest.Api.dll"]
 ```
@@ -676,34 +676,27 @@ cd ~/codefest
 
 # Create the .env file
 cat > .env << 'EOF'
-MYSQL_ROOT_PASSWORD=codefest_root_2024
-MYSQL_PASSWORD=codefest_pass_2024
+POSTGRES_PASSWORD=codefest_pass_2024
 EOF
 
-# Build and start infrastructure
-docker compose up -d mysql
-
-# Wait for MySQL to be healthy, then start API
-docker compose up -d api
+# Build and start everything
+docker compose up -d --build
 
 # Check logs
 docker compose logs -f api
 
-# Run EF migrations (from inside the API container)
-docker compose exec api dotnet ef database update
-
-# Or run migrations from host if dotnet-ef is installed:
+# Migrations are applied automatically on startup.
+# To run manually from host (if dotnet-ef is installed):
 cd CodeFest.Api
 dotnet ef migrations add InitialCreate
 dotnet ef database update
 cd ..
 
 # Seed challenges
-# (Create a seed endpoint or run via: )
-curl -X POST http://localhost:5000/api/challenges/seed
+curl -X POST http://localhost:5050/api/challenges/seed
 
 # Verify API is running
-curl http://localhost:5000/api/health
+curl http://localhost:5050/api/health
 
 # Full restart
 docker compose down && docker compose up -d --build
@@ -891,8 +884,8 @@ docker compose up -d --build
 
 # Access the app
 # Student UI:  http://localhost:4200
-# API:         http://localhost:5000
-# SignalR Hub: http://localhost:5000/hubs/codefest
+# API:         http://localhost:5050
+# SignalR Hub: http://localhost:5050/hubs/codefest
 
 # Watch client logs
 docker compose logs -f client
@@ -1175,7 +1168,7 @@ nano .env
 docker compose up -d --build
 
 # Verify
-curl http://localhost:5000/api/health
+curl http://localhost:5050/api/health
 
 # If using a domain (e.g., codefest.yourdomain.com):
 # Add nginx reverse proxy or Caddy for HTTPS
@@ -1192,7 +1185,7 @@ sudo systemctl restart caddy
 ### Before the session
 
 - [ ] Test Docker Compose is running: `docker compose ps`
-- [ ] Verify API health: `curl http://localhost:5000/api/health`
+- [ ] Verify API health: `curl http://localhost:5050/api/health`
 - [ ] Open teacher dashboard, create a session
 - [ ] Note the session join code
 - [ ] Write join URL + code on the board / project it
@@ -1212,7 +1205,7 @@ sudo systemctl restart caddy
 - [ ] End session from dashboard — triggers final leaderboard + celebration
 - [ ] Export activity logs: `GET /api/teacher/sessions/{code}/activity?format=csv`
 - [ ] Review submissions: `GET /api/teacher/sessions/{code}/submissions`
-- [ ] `docker compose down` to stop everything (data persists in MySQL volume)
+- [ ] `docker compose down` to stop everything (data persists in PostgreSQL volume)
 
 ---
 
@@ -1224,9 +1217,9 @@ mkdir -p ~/codefest && cd ~/codefest
 dotnet new webapi -n CodeFest.Api --use-controllers
 cd CodeFest.Api
 dotnet add package Microsoft.AspNetCore.SignalR
-dotnet add package Pomelo.EntityFrameworkCore.MySql
+dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
 dotnet add package Microsoft.EntityFrameworkCore.Design
-dotnet add package Microsoft.CodeAnalysis.CSharp.Scripting
+dotnet add package Microsoft.CodeAnalysis.CSharp
 cd ..
 npx @angular/cli new codefest-client --routing --style=scss --ssr=false --skip-tests
 cd codefest-client
@@ -1239,12 +1232,12 @@ docker compose ps                      # Check status
 docker compose logs -f api             # Watch API logs
 docker compose logs -f client          # Watch client logs
 docker compose down                    # Stop everything
-docker compose down -v                 # Stop + delete data
+docker compose down -v                 # Stop + delete all data
 
 # === DATABASE ===
 docker compose exec api dotnet ef migrations add <Name>
 docker compose exec api dotnet ef database update
-docker compose exec mysql mysql -u codefest -p codefest  # MySQL shell
+docker compose exec postgres psql -U postgres -d codefest  # PostgreSQL shell
 
 # === ANGULAR DEV (outside Docker for hot reload) ===
 cd codefest-client
