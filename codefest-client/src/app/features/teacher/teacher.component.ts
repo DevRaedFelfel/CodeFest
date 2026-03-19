@@ -138,12 +138,14 @@ import { SessionCreatorComponent } from './session-creator/session-creator.compo
         min-height: 100vh;
         background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
         color: #fff;
+        overflow-y: auto;
       }
 
       .dashboard-container {
         max-width: 1400px;
         margin: 0 auto;
         padding: 1rem 1.5rem;
+        padding-bottom: 3rem;
       }
 
       .header {
@@ -191,6 +193,7 @@ import { SessionCreatorComponent } from './session-creator/session-creator.compo
       .session-list-view {
         max-width: 800px;
         margin: 2rem auto;
+        padding-bottom: 2rem;
       }
 
       .list-header {
@@ -336,7 +339,7 @@ import { SessionCreatorComponent } from './session-creator/session-creator.compo
         border-radius: 12px;
         padding: 1rem;
         max-height: 500px;
-        overflow: hidden;
+        overflow-y: auto;
       }
 
       .bottom-panels {
