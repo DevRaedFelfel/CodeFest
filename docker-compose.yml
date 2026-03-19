@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   api:
     build:
@@ -9,27 +7,26 @@ services:
       - "5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=codefest;User=codefest;Password=${MYSQL_PASSWORD}
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=codefest;Username=codefest;Password=${POSTGRES_PASSWORD}
       - ASPNETCORE_URLS=http://+:8080
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     networks:
       - codefest-net
 
-  mysql:
-    image: mysql:8.0
+  postgres:
+    image: postgres:16-alpine
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: codefest
-      MYSQL_USER: codefest
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      POSTGRES_DB: codefest
+      POSTGRES_USER: codefest
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "3306:3306"
+      - "5433:5432"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "pg_isready -U codefest -d codefest"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -37,7 +34,7 @@ services:
       - codefest-net
 
 volumes:
-  mysql-data:
+  pg-data:
 
 networks:
   codefest-net:

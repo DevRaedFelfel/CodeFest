@@ -32,14 +32,13 @@ cd CodeFest
 
 # 2. Create the .env file
 cat > .env << 'EOF'
-MYSQL_ROOT_PASSWORD=codefest_root_2024
-MYSQL_PASSWORD=codefest_pass_2024
+POSTGRES_PASSWORD=codefest_pass_2024
 EOF
 
-# 3. Start MySQL first (wait for it to be healthy)
-docker compose up -d mysql
+# 3. Start PostgreSQL first (wait for it to be healthy)
+docker compose up -d postgres
 
-# 4. Check MySQL is ready
+# 4. Check PostgreSQL is ready
 docker compose ps
 
 # 5. Start the API
@@ -83,14 +82,14 @@ docker compose logs -f api
 # Restart everything
 docker compose down && docker compose up -d --build
 
-# Stop everything (data is preserved in MySQL volume)
+# Stop everything (data is preserved in PostgreSQL volume)
 docker compose down
 
 # Stop everything AND delete data
 docker compose down -v
 
-# Open MySQL shell
-docker compose exec mysql mysql -u codefest -pcodefest_pass_2024 codefest
+# Open PostgreSQL shell
+docker compose exec postgres psql -U codefest -d codefest
 ```
 
 ## Troubleshooting
@@ -98,7 +97,7 @@ docker compose exec mysql mysql -u codefest -pcodefest_pass_2024 codefest
 | Problem | Fix |
 |---------|-----|
 | `docker: permission denied` | Run `sudo usermod -aG docker $USER` then log out/in |
-| MySQL not starting | Check logs: `docker compose logs mysql` |
-| API can't connect to MySQL | Wait for MySQL health check: `docker compose ps` should show `healthy` |
+| PostgreSQL not starting | Check logs: `docker compose logs postgres` |
+| API can't connect to PostgreSQL | Wait for health check: `docker compose ps` should show `healthy` |
 | Port 5000 already in use | Change the port in `docker-compose.yml` under `api.ports` |
-| Port 3306 already in use | Stop local MySQL or change the port mapping |
+| Port 5433 already in use | Change the port mapping in `docker-compose.yml` under `postgres.ports` |

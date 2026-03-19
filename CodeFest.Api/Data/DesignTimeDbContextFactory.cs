@@ -8,10 +8,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<CodeFestDb
     public CodeFestDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<CodeFestDbContext>();
-        // Use a dummy connection string for migration generation only
-        optionsBuilder.UseMySql(
-            "Server=localhost;Database=codefest;User=root;Password=dummy",
-            new MySqlServerVersion(new Version(8, 0, 0)));
+        optionsBuilder.UseNpgsql("Host=localhost;Database=codefest;Username=postgres;Password=dummy");
 
         return new CodeFestDbContext(optionsBuilder.Options);
     }
