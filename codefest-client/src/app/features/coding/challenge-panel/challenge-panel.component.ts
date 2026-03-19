@@ -194,17 +194,17 @@ export class ChallengePanelComponent {
   @Input() hints: string[] = [];
 
   get visibleTests() {
-    return this.challenge?.testCases.filter((t) => !t.isHidden) ?? [];
+    return this.challenge?.testCases?.filter((t) => !t.isHidden) ?? [];
   }
 
   get difficultyClass(): string {
     if (!this.challenge) return '';
-    return DifficultyLevel[this.challenge.difficulty].toLowerCase();
+    return String(this.challenge.difficulty).toLowerCase();
   }
 
   get difficultyLabel(): string {
     if (!this.challenge) return '';
-    return DifficultyLevel[this.challenge.difficulty];
+    return String(this.challenge.difficulty);
   }
 
   get formattedDescription(): string {
