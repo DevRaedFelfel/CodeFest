@@ -1,0 +1,59 @@
+NAME: فرح فريد ادريس أبو زيادة
+CODE:
+using System;
+namespace HelloWorld
+{
+    class Program
+    {
+        static void Main()
+        {
+            
+            Console.WriteLine("╔═══════════════════════════════════╗");
+            Console.WriteLine("║      TRIP COST CALCULATOR         ║");
+            Console.WriteLine("╚═══════════════════════════════════╝");
+
+
+            Console.Write("Where are you traveling to ? ");
+            String city = Console.ReadLine();
+
+            Console.Write("How many days ?");
+            int days = int.Parse(Console.ReadLine());
+
+
+            Console.Write("Hotel cost per night ($) ? ");
+            double hotelCost = double.Parse(Console.ReadLine());
+
+            Console.Write("Food budget per day ($) ? ");
+            double foodCost = double.Parse(Console.ReadLine());
+
+            double hotelTotal = hotelCost * days;
+
+            double foodTotal = foodCost * days;
+
+            double totalCost = hotelTotal + foodTotal;
+
+
+            Console.WriteLine("-----Trip Summarey----------");
+
+            Console.WriteLine($"Desination: {city}");
+            Console.WriteLine($"Duration: {days} days");
+            Console.WriteLine($"Hotel total: ${hotelTotal}");
+            Console.WriteLine($"Food total: ${foodTotal}");
+
+            Console.WriteLine("---------------------------");
+
+            Console.WriteLine($"Total Cost: ${totalCost}");
+
+
+            Console.WriteLine("---------------------------");
+            Console.WriteLine("Have a great trip to " + city + "!");
+
+
+        }
+
+    }
+}
+
+
+
+

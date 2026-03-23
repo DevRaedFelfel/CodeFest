@@ -1,0 +1,54 @@
+NAME: هيا سمير محمد النجار
+CODE:
+using System;
+					
+public class Program
+{
+	public static void Main()
+	{
+		// Trip Cost Calculator
+		// Week 1 - Assignment
+
+		// 1.Display welcome header
+		Console.WriteLine("=== Trip Cost Calculator ===");
+		Console.WriteLine();
+
+		//2. User
+		// Destination
+		Console.Write("Where are you traveling to? ");
+		string destination = Console.ReadLine();
+
+		// Number of days
+		Console.Write("How many days? ");
+		int days = int.Parse(Console.ReadLine());
+
+		//Hotel cost per night
+		Console.Write("Hotel cost per night ($)? ");
+		int hotelCost_PerNight = int.Parse(Console.ReadLine());
+
+		// Food cost per day
+		Console.Write("Food budget per day ($)? ");
+		int foodCost_PerDay = int.Parse(Console.ReadLine());
+
+		// 3.Calculate
+		//Total hotel cost = days × cost per night
+		int hotelTotal = days * hotelCost_PerNight;
+
+		//Total food cost = days × food cost per day
+		int foodTotal = days * foodCost_PerDay;
+
+		//Overall total cost = hotel total + food total
+		int totalCost = hotelTotal + foodTotal;
+		
+		//4.Display the results
+		Console.WriteLine("───────────── Trip Summary ──────────");
+		Console.WriteLine($"Destination:    {destination}");
+		Console.WriteLine($"Duration:       {days} days");
+		Console.WriteLine($"Hotel total:    ${hotelTotal}");
+		Console.WriteLine($"Food total:     ${foodTotal}");
+		Console.WriteLine("─────────────────────────────────────");
+		Console.WriteLine($"TOTAL COST:     ${totalCost}");
+		Console.WriteLine("─────────────────────────────────────");
+		Console.WriteLine($"Have a great trip to {destination}!");
+	}
+}

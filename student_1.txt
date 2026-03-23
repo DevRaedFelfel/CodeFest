@@ -1,0 +1,38 @@
+NAME: رغد غسان محمد جوده
+CODE:
+using System;
+
+class Program
+{
+    static void Main()
+    {
+        Console.WriteLine("=== Trip Cost Calculator ===");
+        Console.WriteLine();
+
+        Console.Write("Where are you travelling to? ");
+        string destination = Console.ReadLine();
+
+        Console.Write("How many days? ");
+        int days = int.Parse(Console.ReadLine());
+
+        Console.Write("Hotel cost per night ($)? ");
+        int night = int.Parse(Console.ReadLine());
+
+        Console.Write("Food budget per day ($)? ");
+        int food = int.Parse(Console.ReadLine());
+
+        int hotelTotal = days * night;
+        int foodTotal = days * food;
+        int total = hotelTotal + foodTotal;
+
+        Console.WriteLine("=== Trip Summary ===");
+        Console.WriteLine("Destination:\t\t" + destination);
+        Console.WriteLine("Duration:\t\t" + days + " days");
+        Console.WriteLine("Hotel total:\t\t$" + hotelTotal);
+        Console.WriteLine("Food total:\t\t$" + foodTotal);
+        Console.WriteLine();
+        Console.WriteLine("TOTAL COST: $" + total);
+        Console.WriteLine();
+        Console.WriteLine("Have a great trip to " + destination + "!");
+   {
+                  }

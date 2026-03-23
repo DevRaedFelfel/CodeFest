@@ -27,5 +27,8 @@ Thumbs.db
 *.swp
 *.swo
 
+## Test artifacts
+e2e/test-results/
+
 ## Claude
 .claude/
