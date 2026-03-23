@@ -3,8 +3,13 @@ import { test, expect } from '@playwright/test';
 const API_URL = 'http://localhost:5050';
 const APP_URL = 'http://localhost:4200';
 
+// Helper: unique name to avoid collisions from previous runs
+function uniqueName(base: string): string {
+  return `${base} ${Date.now()}`;
+}
+
 // Helper: create a session via API
-async function createSession(name: string): Promise<{ code: string }> {
+async function createSession(name: string): Promise<{ code: string; name: string }> {
   await fetch(`${API_URL}/api/challenges/seed`, { method: 'POST' });
   const challengesRes = await fetch(`${API_URL}/api/challenges`);
   const challenges = await challengesRes.json();
@@ -29,7 +34,7 @@ async function setStatus(code: string, status: string) {
 
 test.describe('Session Management - Delete', () => {
   test('Delete a session from the session list', async ({ browser }) => {
-    const session = await createSession('Delete Me Session');
+    const session = await createSession(uniqueName('Delete Me'));
 
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -41,7 +46,7 @@ test.describe('Session Management - Delete', () => {
     await page.waitForLoadState('networkidle');
 
     // Verify session appears in the list
-    const sessionCard = page.locator('.session-card', { hasText: 'Delete Me Session' });
+    const sessionCard = page.locator('.session-card', { hasText: session.name });
     await expect(sessionCard).toBeVisible();
 
     // Click the delete button
@@ -56,7 +61,7 @@ test.describe('Session Management - Delete', () => {
   });
 
   test('Delete session via API returns 204', async ({ request }) => {
-    const session = await createSession('API Delete Session');
+    const session = await createSession(uniqueName('API Delete'));
 
     const res = await request.delete(`${API_URL}/api/teacher/sessions/${session.code}`);
     expect(res.status()).toBe(204);
@@ -74,14 +79,14 @@ test.describe('Session Management - Delete', () => {
 
 test.describe('Session Management - Close (End)', () => {
   test('End an active session from dashboard', async ({ page }) => {
-    const session = await createSession('Close Me Session');
+    const session = await createSession(uniqueName('Close Me'));
     await setStatus(session.code, 'start');
 
     await page.goto(`${APP_URL}/teacher`);
     await page.waitForLoadState('networkidle');
 
     // Select the session
-    const sessionCard = page.locator('.session-card', { hasText: 'Close Me Session' });
+    const sessionCard = page.locator('.session-card', { hasText: session.name });
     await sessionCard.click();
 
     // Wait for dashboard to load with session control
@@ -98,7 +103,7 @@ test.describe('Session Management - Close (End)', () => {
   });
 
   test('End session via API', async ({ request }) => {
-    const session = await createSession('API End Session');
+    const session = await createSession(uniqueName('API End'));
     await setStatus(session.code, 'start');
 
     const res = await request.put(`${API_URL}/api/teacher/sessions/${session.code}/status`, {
@@ -113,7 +118,7 @@ test.describe('Session Management - Close (End)', () => {
 
 test.describe('Session Management - Reopen', () => {
   test('Reopen an ended session from dashboard', async ({ page }) => {
-    const session = await createSession('Reopen Me Session');
+    const session = await createSession(uniqueName('Reopen Me'));
     await setStatus(session.code, 'start');
     await setStatus(session.code, 'end');
 
@@ -121,7 +126,7 @@ test.describe('Session Management - Reopen', () => {
     await page.waitForLoadState('networkidle');
 
     // Select the ended session
-    const sessionCard = page.locator('.session-card', { hasText: 'Reopen Me Session' });
+    const sessionCard = page.locator('.session-card', { hasText: session.name });
     await sessionCard.click();
 
     // Wait for session control
@@ -142,7 +147,7 @@ test.describe('Session Management - Reopen', () => {
   });
 
   test('Reopen session via API', async ({ request }) => {
-    const session = await createSession('API Reopen Session');
+    const session = await createSession(uniqueName('API Reopen'));
     await setStatus(session.code, 'start');
     await setStatus(session.code, 'end');
 
@@ -156,7 +161,7 @@ test.describe('Session Management - Reopen', () => {
   });
 
   test('Reopen non-ended session returns bad request', async ({ request }) => {
-    const session = await createSession('Non-Ended Session');
+    const session = await createSession(uniqueName('Non-Ended'));
 
     const res = await request.put(`${API_URL}/api/teacher/sessions/${session.code}/status`, {
       data: { status: 'reopen' },
