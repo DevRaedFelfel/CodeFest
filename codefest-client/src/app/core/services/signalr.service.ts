@@ -169,6 +169,10 @@ export class SignalrService {
   }
 
   // Teacher methods
+  async joinAsTeacher(sessionCode: string): Promise<void> {
+    return this.hubConnection.invoke('JoinAsTeacher', sessionCode);
+  }
+
   async createSession(
     sessionName: string,
     challengeIds: number[]

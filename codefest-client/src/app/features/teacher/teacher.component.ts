@@ -424,17 +424,25 @@ export class TeacherComponent implements OnInit, OnDestroy {
     return labels[status] ?? 'Unknown';
   }
 
-  selectSession(session: Session): void {
+  async selectSession(session: Session): Promise<void> {
     this.teacherService.selectSession(session);
-    this.connectSignalR();
+    await this.connectSignalR(session.code);
   }
 
-  async connectSignalR(): Promise<void> {
+  async connectSignalR(sessionCode?: string): Promise<void> {
     if (!this.signalr.isConnected) {
       try {
         await this.signalr.connect();
       } catch (err) {
         console.error('Failed to connect SignalR', err);
+        return;
+      }
+    }
+    if (sessionCode) {
+      try {
+        await this.signalr.joinAsTeacher(sessionCode);
+      } catch (err) {
+        console.error('Failed to join teacher group', err);
       }
     }
   }
@@ -443,9 +451,9 @@ export class TeacherComponent implements OnInit, OnDestroy {
     name: string;
     challengeIds: number[];
   }): Promise<void> {
-    await this.teacherService.createSession(data.name, data.challengeIds);
+    const session = await this.teacherService.createSession(data.name, data.challengeIds);
     this.showCreator = false;
-    await this.connectSignalR();
+    await this.connectSignalR(session.code);
   }
 
   async onStart(): Promise<void> {

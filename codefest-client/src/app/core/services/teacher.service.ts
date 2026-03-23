@@ -82,7 +82,8 @@ export class TeacherService {
     });
   }
 
-  private mapStatus(status: string): number {
+  private mapStatus(status: string | number): number {
+    if (typeof status === 'number') return status;
     const map: Record<string, number> = {
       Lobby: 0,
       Active: 1,
@@ -92,17 +93,22 @@ export class TeacherService {
     return map[status] ?? 0;
   }
 
+  private normalizeSession(session: any): Session {
+    return { ...session, status: this.mapStatus(session.status) };
+  }
+
   loadSessions(): void {
-    this.http.get<Session[]>(`${this.baseUrl}/sessions`).subscribe({
-      next: (sessions) => this.sessions$.next(sessions),
+    this.http.get<any[]>(`${this.baseUrl}/sessions`).subscribe({
+      next: (sessions) => this.sessions$.next(sessions.map(s => this.normalizeSession(s))),
       error: (err) => console.error('Failed to load sessions', err),
     });
   }
 
   async createSession(name: string, challengeIds: number[]): Promise<Session> {
-    const session = await firstValueFrom(
-      this.http.post<Session>(`${this.baseUrl}/sessions`, { name, challengeIds })
+    const raw = await firstValueFrom(
+      this.http.post<any>(`${this.baseUrl}/sessions`, { name, challengeIds })
     );
+    const session = this.normalizeSession({ ...raw, challengeIds });
     this.sessions$.next([session, ...this.sessions$.value]);
     this.currentSession$.next(session);
     return session;

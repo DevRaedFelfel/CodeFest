@@ -25,6 +25,11 @@ public class CodeFestHub : Hub
 
     // --- Teacher Actions ---
 
+    public async Task JoinAsTeacher(string sessionCode)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"teacher-{sessionCode}");
+    }
+
     public async Task<object> CreateSession(string sessionName, List<int> challengeIds)
     {
         var session = await _sessionService.CreateAsync(sessionName, challengeIds, Context.ConnectionId);
