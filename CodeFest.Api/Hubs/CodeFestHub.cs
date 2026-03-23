@@ -94,6 +94,7 @@ public class CodeFestHub : Hub
         var leaderboard = await _sessionService.GetLeaderboardAsync(sessionCode);
         await Clients.Group($"session-{sessionCode}").SendAsync("SessionEnded", leaderboard);
         await Clients.Group($"teacher-{sessionCode}").SendAsync("SessionEnded", leaderboard);
+        await Clients.Group($"teacher-{sessionCode}").SendAsync("SessionStatusChanged", session.Status.ToString());
     }
 
     public async Task DeleteSession(string sessionCode)

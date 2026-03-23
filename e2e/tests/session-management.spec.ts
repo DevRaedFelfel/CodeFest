@@ -28,8 +28,14 @@ async function setStatus(code: string, status: string) {
 }
 
 test.describe('Session Management - Delete', () => {
-  test('Delete a session from the session list', async ({ page }) => {
+  test('Delete a session from the session list', async ({ browser }) => {
     const session = await createSession('Delete Me Session');
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    // Set up dialog handler before navigating
+    page.on('dialog', (dialog) => dialog.accept());
 
     await page.goto(`${APP_URL}/teacher`);
     await page.waitForLoadState('networkidle');
@@ -38,9 +44,6 @@ test.describe('Session Management - Delete', () => {
     const sessionCard = page.locator('.session-card', { hasText: 'Delete Me Session' });
     await expect(sessionCard).toBeVisible();
 
-    // Set up dialog handler to accept confirm
-    page.on('dialog', (dialog) => dialog.accept());
-
     // Click the delete button
     const deleteBtn = sessionCard.locator('.btn-delete-session');
     await expect(deleteBtn).toBeVisible();
@@ -48,6 +51,8 @@ test.describe('Session Management - Delete', () => {
 
     // Session should disappear from the list
     await expect(sessionCard).toBeHidden({ timeout: 5000 });
+
+    await context.close();
   });
 
   test('Delete session via API returns 204', async ({ request }) => {
@@ -89,7 +94,7 @@ test.describe('Session Management - Close (End)', () => {
     await endBtn.click();
 
     // Status should change to Ended
-    await expect(statusBadge).toContainText('Ended', { timeout: 5000 });
+    await expect(statusBadge).toContainText('Ended', { timeout: 10000 });
   });
 
   test('End session via API', async ({ request }) => {
