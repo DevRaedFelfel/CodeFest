@@ -443,8 +443,9 @@ export class TeacherComponent implements OnInit, OnDestroy {
     name: string;
     challengeIds: number[];
   }): Promise<void> {
-    this.teacherService.createSession(data.name, data.challengeIds);
+    await this.teacherService.createSession(data.name, data.challengeIds);
     this.showCreator = false;
+    await this.connectSignalR();
   }
 
   async onStart(): Promise<void> {

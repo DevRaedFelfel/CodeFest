@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { SignalrService } from './signalr.service';
 import {
   Session,
@@ -99,16 +99,13 @@ export class TeacherService {
     });
   }
 
-  createSession(name: string, challengeIds: number[]): void {
-    this.http
-      .post<Session>(`${this.baseUrl}/sessions`, { name, challengeIds })
-      .subscribe({
-        next: (session) => {
-          this.sessions$.next([session, ...this.sessions$.value]);
-          this.currentSession$.next(session);
-        },
-        error: (err) => console.error('Failed to create session', err),
-      });
+  async createSession(name: string, challengeIds: number[]): Promise<Session> {
+    const session = await firstValueFrom(
+      this.http.post<Session>(`${this.baseUrl}/sessions`, { name, challengeIds })
+    );
+    this.sessions$.next([session, ...this.sessions$.value]);
+    this.currentSession$.next(session);
+    return session;
   }
 
   selectSession(session: Session): void {
