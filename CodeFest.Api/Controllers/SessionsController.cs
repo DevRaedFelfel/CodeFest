@@ -83,12 +83,20 @@ public class SessionsController : ControllerBase
             "paused" or "pause" => await _sessionService.PauseAsync(code),
             "resumed" or "resume" => await _sessionService.ResumeAsync(code),
             "ended" or "end" => await _sessionService.EndAsync(code),
+            "lobby" or "reopen" => await _sessionService.ReopenAsync(code),
             _ => null
         };
 
         if (session == null) return BadRequest(new { message = "Invalid status transition." });
 
         return Ok(new { session.Code, Status = session.Status.ToString() });
+    }
+    [HttpDelete("{code}")]
+    public async Task<IActionResult> DeleteSession(string code)
+    {
+        var deleted = await _sessionService.DeleteAsync(code);
+        if (!deleted) return NotFound(new { message = "Session not found." });
+        return NoContent();
     }
 }
 

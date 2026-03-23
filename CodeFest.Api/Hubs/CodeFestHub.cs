@@ -96,6 +96,24 @@ public class CodeFestHub : Hub
         await Clients.Group($"teacher-{sessionCode}").SendAsync("SessionEnded", leaderboard);
     }
 
+    public async Task DeleteSession(string sessionCode)
+    {
+        var deleted = await _sessionService.DeleteAsync(sessionCode);
+        if (!deleted) return;
+
+        await Clients.Group($"session-{sessionCode}").SendAsync("SessionDeleted");
+        await Clients.Group($"teacher-{sessionCode}").SendAsync("SessionDeleted");
+    }
+
+    public async Task ReopenSession(string sessionCode)
+    {
+        var session = await _sessionService.ReopenAsync(sessionCode);
+        if (session == null) return;
+
+        await Clients.Group($"session-{sessionCode}").SendAsync("SessionReopened");
+        await Clients.Group($"teacher-{sessionCode}").SendAsync("SessionStatusChanged", session.Status.ToString());
+    }
+
     public async Task PushHint(string sessionCode, int challengeId, string hint)
     {
         await Clients.Group($"session-{sessionCode}").SendAsync("HintReceived", new { challengeId, hint });

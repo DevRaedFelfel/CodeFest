@@ -38,6 +38,8 @@ export class SignalrService {
   celebration$ = new Subject<string>();
   leaderboardUpdated$ = new Subject<LeaderboardEntry[]>();
   error$ = new Subject<string>();
+  sessionDeleted$ = new Subject<void>();
+  sessionReopened$ = new Subject<void>();
 
   constructor(private zone: NgZone) {}
 
@@ -114,6 +116,8 @@ export class SignalrService {
       this.sessionStatusChanged$.next(status)
     );
     on('HintRequested', (data: any) => this.hintRequested$.next(data));
+    on('SessionDeleted', () => this.sessionDeleted$.next());
+    on('SessionReopened', () => this.sessionReopened$.next());
   }
 
   async joinSession(
@@ -198,6 +202,14 @@ export class SignalrService {
 
   async endSession(sessionCode: string): Promise<void> {
     return this.hubConnection.invoke('EndSession', sessionCode);
+  }
+
+  async deleteSession(sessionCode: string): Promise<void> {
+    return this.hubConnection.invoke('DeleteSession', sessionCode);
+  }
+
+  async reopenSession(sessionCode: string): Promise<void> {
+    return this.hubConnection.invoke('ReopenSession', sessionCode);
   }
 
   async pushHint(

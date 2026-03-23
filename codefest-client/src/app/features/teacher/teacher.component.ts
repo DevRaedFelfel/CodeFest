@@ -44,6 +44,7 @@ import { SessionCreatorComponent } from './session-creator/session-creator.compo
             (pause)="onPause()"
             (resume)="onResume()"
             (end)="onEnd()"
+            (reopen)="onReopen()"
           />
           <button class="btn-back" (click)="backToList()">&#8592; Sessions</button>
         }
@@ -63,9 +64,12 @@ import { SessionCreatorComponent } from './session-creator/session-creator.compo
                 <div class="session-card" (click)="selectSession(session)">
                   <div class="session-card-header">
                     <span class="session-name">{{ session.name }}</span>
-                    <span class="session-status" [class]="'st-' + statusLabel(session.status).toLowerCase()">
-                      {{ statusLabel(session.status) }}
-                    </span>
+                    <div class="session-card-actions">
+                      <span class="session-status" [class]="'st-' + statusLabel(session.status).toLowerCase()">
+                        {{ statusLabel(session.status) }}
+                      </span>
+                      <button class="btn-delete-session" (click)="onDeleteSession(session, $event)" title="Delete session">&#10005;</button>
+                    </div>
                   </div>
                   <div class="session-card-body">
                     <span class="session-code-small">{{ session.code }}</span>
@@ -257,6 +261,28 @@ import { SessionCreatorComponent } from './session-creator/session-creator.compo
       .session-name {
         font-weight: 600;
         font-size: 1rem;
+      }
+
+      .session-card-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .btn-delete-session {
+        background: rgba(255, 71, 87, 0.15);
+        border: 1px solid rgba(255, 71, 87, 0.3);
+        color: #ff4757;
+        border-radius: 6px;
+        padding: 0.15rem 0.45rem;
+        cursor: pointer;
+        font-size: 0.75rem;
+        transition: background 0.2s;
+        line-height: 1;
+      }
+
+      .btn-delete-session:hover {
+        background: rgba(255, 71, 87, 0.4);
       }
 
       .session-status {
@@ -489,6 +515,25 @@ export class TeacherComponent implements OnInit, OnDestroy {
       await this.signalr.endSession(this.currentSession.code);
     } catch (err) {
       console.error('Failed to end session', err);
+    }
+  }
+
+  async onReopen(): Promise<void> {
+    if (!this.currentSession) return;
+    try {
+      await this.signalr.reopenSession(this.currentSession.code);
+    } catch (err) {
+      console.error('Failed to reopen session', err);
+    }
+  }
+
+  async onDeleteSession(session: Session, event: Event): Promise<void> {
+    event.stopPropagation();
+    if (!confirm(`Delete session "${session.name}"? This cannot be undone.`)) return;
+    try {
+      await this.teacherService.deleteSession(session.code);
+    } catch (err) {
+      console.error('Failed to delete session', err);
     }
   }
 

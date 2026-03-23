@@ -80,6 +80,11 @@ export class TeacherService {
         this.currentSession$.next({ ...session, status: this.mapStatus(status) });
       }
     });
+
+    this.signalr.sessionDeleted$.subscribe(() => {
+      this.clearSession();
+      this.loadSessions();
+    });
   }
 
   private mapStatus(status: string | number): number {
@@ -112,6 +117,14 @@ export class TeacherService {
     this.sessions$.next([session, ...this.sessions$.value]);
     this.currentSession$.next(session);
     return session;
+  }
+
+  async deleteSession(code: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`${this.baseUrl}/sessions/${code}`));
+    this.sessions$.next(this.sessions$.value.filter(s => s.code !== code));
+    if (this.currentSession$.value?.code === code) {
+      this.clearSession();
+    }
   }
 
   selectSession(session: Session): void {

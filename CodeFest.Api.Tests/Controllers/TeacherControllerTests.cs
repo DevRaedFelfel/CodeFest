@@ -271,4 +271,54 @@ public class TeacherControllerTests
 
         result.Should().BeOfType<OkObjectResult>();
     }
+
+    // --- DeleteSession ---
+
+    [Fact]
+    public async Task DeleteSession_ShouldReturnNoContent()
+    {
+        var (controller, sessionService, _) = CreateController();
+        var session = await sessionService.CreateAsync("Test", new List<int>(), "conn");
+
+        var result = await controller.DeleteSession(session.Code);
+
+        result.Should().BeOfType<NoContentResult>();
+    }
+
+    [Fact]
+    public async Task DeleteSession_ShouldReturnNotFoundForNonexistent()
+    {
+        var (controller, _, _) = CreateController();
+
+        var result = await controller.DeleteSession("NOPE");
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    // --- Reopen via UpdateStatus ---
+
+    [Fact]
+    public async Task UpdateStatus_ReopenShouldTransitionEndedToLobby()
+    {
+        var (controller, sessionService, _) = CreateController();
+        var session = await sessionService.CreateAsync("Test", new List<int>(), "conn");
+        await sessionService.StartAsync(session.Code);
+        await sessionService.EndAsync(session.Code);
+
+        var result = await controller.UpdateStatus(session.Code, new UpdateStatusRequest { Status = "reopen" });
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task UpdateStatus_ReopenShouldReturnBadRequestForActiveSession()
+    {
+        var (controller, sessionService, _) = CreateController();
+        var session = await sessionService.CreateAsync("Test", new List<int>(), "conn");
+        await sessionService.StartAsync(session.Code);
+
+        var result = await controller.UpdateStatus(session.Code, new UpdateStatusRequest { Status = "reopen" });
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
 }

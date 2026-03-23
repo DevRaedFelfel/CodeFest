@@ -29,6 +29,9 @@ import { CommonModule } from '@angular/common';
           <button class="btn btn-resume" (click)="resume.emit()">Resume</button>
           <button class="btn btn-end" (click)="end.emit()">End Session</button>
         }
+        @if (sessionStatus === 3) {
+          <button class="btn btn-reopen" (click)="reopen.emit()">Reopen Session</button>
+        }
       </div>
     </div>
   `,
@@ -145,6 +148,12 @@ import { CommonModule } from '@angular/common';
         border: 1px solid rgba(255, 71, 87, 0.5);
         color: #ff4757;
       }
+
+      .btn-reopen {
+        background: rgba(0, 210, 255, 0.3);
+        border: 1px solid rgba(0, 210, 255, 0.5);
+        color: #00d2ff;
+      }
     `,
   ],
 })
@@ -155,6 +164,7 @@ export class SessionControlComponent {
   @Output() pause = new EventEmitter<void>();
   @Output() resume = new EventEmitter<void>();
   @Output() end = new EventEmitter<void>();
+  @Output() reopen = new EventEmitter<void>();
 
   copied = false;
 

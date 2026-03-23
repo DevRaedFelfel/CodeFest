@@ -87,6 +87,35 @@ public class SessionService
         return session;
     }
 
+    public async Task<bool> DeleteAsync(string code)
+    {
+        var session = await _db.Sessions
+            .Include(s => s.Students)
+            .FirstOrDefaultAsync(s => s.Code == code);
+        if (session == null) return false;
+
+        var sessionId = session.Id;
+        var studentIds = session.Students.Select(s => s.Id).ToList();
+
+        _db.Submissions.RemoveRange(_db.Submissions.Where(s => s.SessionId == sessionId));
+        _db.ActivityLogs.RemoveRange(_db.ActivityLogs.Where(a => a.SessionId == sessionId));
+        _db.Sessions.Remove(session);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<Session?> ReopenAsync(string code)
+    {
+        var session = await GetByCodeAsync(code);
+        if (session == null || session.Status != SessionStatus.Ended) return null;
+
+        session.Status = SessionStatus.Lobby;
+        session.StartedAt = null;
+        session.EndedAt = null;
+        await _db.SaveChangesAsync();
+        return session;
+    }
+
     public async Task<Student> JoinStudentAsync(string sessionCode, string displayName, string connectionId, StudentClientType clientType)
     {
         var session = await GetByCodeAsync(sessionCode);

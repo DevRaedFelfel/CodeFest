@@ -436,4 +436,142 @@ public class SessionServiceTests
         var found = await service.GetByCodeAsync(session.Code);
         found!.TeacherConnectionId.Should().Be("new-conn");
     }
+
+    // --- DeleteAsync ---
+
+    [Fact]
+    public async Task DeleteAsync_ShouldReturnTrueAndRemoveSession()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var service = CreateService(dbName);
+        var session = await service.CreateAsync("Test", new List<int>(), "conn");
+
+        var result = await service.DeleteAsync(session.Code);
+
+        result.Should().BeTrue();
+        var found = await service.GetByCodeAsync(session.Code);
+        found.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldReturnFalseForNonexistentSession()
+    {
+        var service = CreateService();
+
+        var result = await service.DeleteAsync("NOPE");
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldCascadeDeleteStudents()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var service = CreateService(dbName);
+        var session = await service.CreateAsync("Test", new List<int>(), "conn");
+        await service.JoinStudentAsync(session.Code, "Ali", "c1", StudentClientType.Web);
+        await service.JoinStudentAsync(session.Code, "Sara", "c2", StudentClientType.Web);
+
+        await service.DeleteAsync(session.Code);
+
+        var all = await service.GetAllAsync();
+        all.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldWorkOnEndedSession()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var service = CreateService(dbName);
+        var session = await service.CreateAsync("Test", new List<int>(), "conn");
+        await service.StartAsync(session.Code);
+        await service.EndAsync(session.Code);
+
+        var result = await service.DeleteAsync(session.Code);
+
+        result.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldWorkOnLobbySession()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var service = CreateService(dbName);
+        var session = await service.CreateAsync("Test", new List<int>(), "conn");
+
+        var result = await service.DeleteAsync(session.Code);
+
+        result.Should().BeTrue();
+    }
+
+    // --- ReopenAsync ---
+
+    [Fact]
+    public async Task ReopenAsync_ShouldTransitionFromEndedToLobby()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var service = CreateService(dbName);
+        var session = await service.CreateAsync("Test", new List<int>(), "conn");
+        await service.StartAsync(session.Code);
+        await service.EndAsync(session.Code);
+
+        var result = await service.ReopenAsync(session.Code);
+
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(SessionStatus.Lobby);
+        result.StartedAt.Should().BeNull();
+        result.EndedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ReopenAsync_ShouldReturnNullForNonEndedSession()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var service = CreateService(dbName);
+        var session = await service.CreateAsync("Test", new List<int>(), "conn");
+
+        var result = await service.ReopenAsync(session.Code);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ReopenAsync_ShouldReturnNullForActiveSession()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var service = CreateService(dbName);
+        var session = await service.CreateAsync("Test", new List<int>(), "conn");
+        await service.StartAsync(session.Code);
+
+        var result = await service.ReopenAsync(session.Code);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ReopenAsync_ShouldReturnNullForNonexistentSession()
+    {
+        var service = CreateService();
+
+        var result = await service.ReopenAsync("NOPE");
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ReopenAsync_ShouldPreserveStudents()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var service = CreateService(dbName);
+        var session = await service.CreateAsync("Test", new List<int>(), "conn");
+        await service.JoinStudentAsync(session.Code, "Ali", "c1", StudentClientType.Web);
+        await service.StartAsync(session.Code);
+        await service.EndAsync(session.Code);
+
+        var result = await service.ReopenAsync(session.Code);
+
+        result.Should().NotBeNull();
+        result!.Students.Should().HaveCount(1);
+        result.Students[0].DisplayName.Should().Be("Ali");
+    }
 }
