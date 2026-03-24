@@ -118,4 +118,39 @@ describe('TerminalComponent', () => {
     );
     expect(stopBtn).toBeFalsy();
   });
+
+  describe('error visibility without prior compiling event', () => {
+    it('should show terminal when compileError event arrives without prior compiling', () => {
+      expect(component.isVisible).toBeFalse();
+
+      runStateService.handleRunCompileError([
+        { message: 'Syntax error', line: 1, column: 1, severity: 'Error' },
+      ]);
+
+      expect(component.isVisible).toBeTrue();
+    });
+
+    it('should show terminal when error event arrives without prior compiling', () => {
+      expect(component.isVisible).toBeFalse();
+
+      runStateService.handleRunError('Runtime error occurred');
+
+      expect(component.isVisible).toBeTrue();
+    });
+
+    it('should show terminal on error and display error text', () => {
+      expect(component.isVisible).toBeFalse();
+
+      const writelnSpy = spyOn((component as any).terminal, 'writeln');
+
+      runStateService.handleRunError('NullReferenceException');
+
+      expect(component.isVisible).toBeTrue();
+      expect(writelnSpy).toHaveBeenCalled();
+      const errorCall = writelnSpy.calls.all().find((call) =>
+        (call.args[0] as string).includes('NullReferenceException')
+      );
+      expect(errorCall).toBeTruthy();
+    });
+  });
 });
