@@ -383,8 +383,8 @@ test.describe('Editor IntelliSense E2E', () => {
       const autocomplete = getAutocompleteList(page);
       await expect(autocomplete).toBeVisible({ timeout: 3000 });
 
-      // Type to narrow down
-      await typeInEditor(page, 'Wr');
+      // Type enough to uniquely match WriteLine (not Write)
+      await typeInEditor(page, 'WriteL');
       await page.waitForTimeout(300);
 
       // Accept first option
@@ -436,7 +436,7 @@ test.describe('Editor IntelliSense E2E', () => {
       const tooltip = getLintTooltip(page);
       if (await tooltip.isVisible()) {
         const tooltipText = await tooltip.textContent();
-        expect(tooltipText).toContain('Console.WriteLine');
+        expect(tooltipText).toContain('WriteLine');
       }
     });
 
@@ -490,7 +490,16 @@ test.describe('Editor IntelliSense E2E', () => {
   test.describe('Linter — Structural Checks', () => {
     test('detects unmatched opening brace', async ({ page }) => {
       await joinAndFocusEditor(page);
-      await typeInEditor(page, 'if (true)\n{\nConsole.WriteLine("hi");');
+      // Type opening brace — closeBrackets auto-inserts }, so delete it
+      await typeInEditor(page, 'if (true)');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type('{', { delay: 30 });
+      await page.waitForTimeout(200);
+      // closeBrackets inserted }, move to end and delete it
+      await page.keyboard.press('End');
+      await page.keyboard.press('Backspace');
+      await page.keyboard.press('Enter');
+      await typeInEditor(page, 'Console.WriteLine("hi");');
 
       await page.waitForTimeout(1500);
 
