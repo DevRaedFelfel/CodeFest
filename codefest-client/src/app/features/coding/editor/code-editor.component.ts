@@ -16,7 +16,9 @@ import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { bracketMatching, indentOnInput, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
-import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import { autocompletion, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import { linter } from '@codemirror/lint';
+import { csharpCompletionSource, csharpLinter, csharpHover } from './extensions';
 
 @Component({
   selector: 'app-code-editor',
@@ -51,6 +53,7 @@ export class CodeEditorComponent implements AfterViewInit, OnDestroy {
   @ViewChild('editorContainer') editorContainer!: ElementRef;
   @Input() initialCode = '';
   @Input() readOnly = false;
+  @Input() weekNumber?: number;
   @Output() codeChange = new EventEmitter<string>();
 
   private view!: EditorView;
@@ -74,6 +77,13 @@ export class CodeEditorComponent implements AfterViewInit, OnDestroy {
         indentOnInput(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         javascript(), // Covers C# syntax basics
+        autocompletion({
+          override: [csharpCompletionSource(this.weekNumber)],
+          activateOnTyping: true,
+          maxRenderedOptions: 50,
+        }),
+        linter(csharpLinter, { delay: 500 }),
+        csharpHover(),
         oneDark,
         keymap.of([
           ...defaultKeymap,
