@@ -14,7 +14,7 @@ async function createSession(
   name: string,
   challengeIds: number[]
 ): Promise<string> {
-  const res = await fetch(`${API_URL}/api/sessions`, {
+  const res = await fetch(`${API_URL}/api/teacher/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, challengeIds }),
@@ -69,11 +69,11 @@ test.describe.serial('Broadcast & Hint Feature', () => {
   let teacherContext: BrowserContext;
   let studentContext: BrowserContext;
   let sessionCode: string;
+  let firstChallengeId: number;
 
   test.beforeAll(async ({ browser }) => {
     const challengeIds = await seedChallenges();
-    const uniqueName = `Broadcast E2E ${Date.now()}`;
-    sessionCode = await createSession(uniqueName, challengeIds);
+    firstChallengeId = challengeIds[0];
 
     teacherContext = await browser.newContext({
       viewport: { width: 1400, height: 900 },
@@ -82,13 +82,25 @@ test.describe.serial('Broadcast & Hint Feature', () => {
     teacherPage = await teacherContext.newPage();
     studentPage = await studentContext.newPage();
 
-    // Teacher opens dashboard and selects the session
+    // Teacher creates session through the UI (this establishes SignalR)
     await teacherPage.goto(`${APP_URL}/teacher`);
+    await teacherPage.waitForTimeout(1500);
+    await teacherPage.click('text=+ Create Session');
+    await expect(teacherPage.locator('text=Create New Session')).toBeVisible();
+    await teacherPage.fill('#sessionName', `Broadcast E2E ${Date.now()}`);
+    await teacherPage.waitForTimeout(1000);
+    await teacherPage.locator('.challenge-item').first().locator('input[type="checkbox"]').check();
+    const createBtn = teacherPage.locator('.create-btn');
+    await expect(createBtn).toBeEnabled();
+    await createBtn.click();
+
+    // Grab the session code from the dashboard
+    const codeDisplay = teacherPage.locator('.code-display .code');
+    await expect(codeDisplay).toBeVisible({ timeout: 10000 });
+    sessionCode = (await codeDisplay.textContent())!.trim();
+
+    // Wait for SignalR connection to establish after session creation
     await teacherPage.waitForTimeout(2000);
-    await teacherPage.click(`text=${uniqueName}`);
-    await expect(teacherPage.locator(`text=${sessionCode}`)).toBeVisible({
-      timeout: 5000,
-    });
 
     // Teacher starts the session
     const startBtn = teacherPage.locator('.btn-start');
@@ -96,7 +108,7 @@ test.describe.serial('Broadcast & Hint Feature', () => {
     await startBtn.click();
     await expect(teacherPage.locator('.status-badge')).toContainText(
       'Active',
-      { timeout: 10000 }
+      { timeout: 15000 }
     );
 
     // Student joins the active session
@@ -182,7 +194,7 @@ test.describe.serial('Broadcast & Hint Feature', () => {
     const panel = teacherPage.locator('app-broadcast-panel');
     await panel.scrollIntoViewIfNeeded();
 
-    await panel.locator('.challenge-input').fill('1');
+    await panel.locator('.challenge-input').fill(String(firstChallengeId));
     await panel.locator('.hint-input').fill(hintMessage);
     await panel.locator('.btn-hint').click();
 
