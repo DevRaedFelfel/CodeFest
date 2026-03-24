@@ -34,6 +34,7 @@ public class TeacherController : ControllerBase
             s.CreatedAt,
             s.StartedAt,
             s.EndedAt,
+            s.ChallengeIds,
             StudentCount = s.Students.Count
         }));
     }

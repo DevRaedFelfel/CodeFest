@@ -101,7 +101,7 @@ import { SessionCreatorComponent } from './session-creator/session-creator.compo
           <div class="main-area">
             <app-student-grid
               [students]="students"
-              [totalChallenges]="currentSession.challengeIds.length"
+              [totalChallenges]="currentSession.challengeIds?.length ?? 0"
               (selectStudent)="onSelectStudent($event)"
             />
           </div>

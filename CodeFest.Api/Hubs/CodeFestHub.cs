@@ -122,7 +122,7 @@ public class CodeFestHub : Hub
 
     public async Task BroadcastMessage(string sessionCode, string message)
     {
-        await Clients.Group($"session-{sessionCode}").SendAsync("BroadcastReceived", message);
+        await Clients.Group($"session-{sessionCode}").SendAsync("BroadcastReceived", new { message });
     }
 
     public async Task UnlockNextChallenge(string sessionCode)
