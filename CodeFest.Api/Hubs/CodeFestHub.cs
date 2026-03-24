@@ -57,12 +57,14 @@ public class CodeFestHub : Hub
                     challenge.Title,
                     challenge.Description,
                     challenge.StarterCode,
+                    challenge.Order,
                     challenge.Points,
                     challenge.TimeLimitSeconds,
                     challenge.Difficulty,
                     TestCases = challenge.TestCases
                         .Where(t => !t.IsHidden)
-                        .Select(t => new { t.Id, t.Description, t.Input, t.ExpectedOutput })
+                        .Select(t => new { t.Id, t.ChallengeId, t.Description, t.Input, t.ExpectedOutput, t.IsHidden, t.Order }),
+                    challenge.PatternChecks
                 };
                 await Clients.Group($"session-{sessionCode}").SendAsync("SessionStarted", clientChallenge);
             }
@@ -279,12 +281,14 @@ public class CodeFestHub : Hub
                         nextChallenge.Title,
                         nextChallenge.Description,
                         nextChallenge.StarterCode,
+                        nextChallenge.Order,
                         nextChallenge.Points,
                         nextChallenge.TimeLimitSeconds,
                         nextChallenge.Difficulty,
                         TestCases = nextChallenge.TestCases
                             .Where(t => !t.IsHidden)
-                            .Select(t => new { t.Id, t.Description, t.Input, t.ExpectedOutput })
+                            .Select(t => new { t.Id, t.ChallengeId, t.Description, t.Input, t.ExpectedOutput, t.IsHidden, t.Order }),
+                        nextChallenge.PatternChecks
                     };
                     await Clients.Caller.SendAsync("NextChallenge", clientChallenge);
                 }

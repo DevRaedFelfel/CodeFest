@@ -852,6 +852,7 @@ export class CodingComponent implements OnInit, OnDestroy {
   exitSubmitting = false;
 
   private currentCode = '';
+  private initialCodeSet = false;
   private subs: Subscription[] = [];
 
   constructor(
@@ -880,6 +881,11 @@ export class CodingComponent implements OnInit, OnDestroy {
     this.subs.push(
       this.sessionService.state.subscribe((s) => {
         this.state = s;
+        // Initialize currentCode with starter code so Run works before user types
+        if (!this.initialCodeSet && s.currentChallenge?.starterCode) {
+          this.currentCode = s.currentChallenge.starterCode;
+          this.initialCodeSet = true;
+        }
       })
     );
 
@@ -905,6 +911,8 @@ export class CodingComponent implements OnInit, OnDestroy {
     this.subs.push(
       this.signalr.nextChallenge$.subscribe((challenge) => {
         this.showResults = false;
+        this.currentCode = challenge.starterCode;
+        this.initialCodeSet = true;
         this.timer?.reset(challenge.timeLimitSeconds);
         setTimeout(() => {
           this.editor?.setCode(challenge.starterCode);

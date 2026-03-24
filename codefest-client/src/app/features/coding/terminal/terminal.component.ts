@@ -480,10 +480,12 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
 
       case 'compileError':
+        this.show();
         this.renderCompileErrors(event.data as CompileError[]);
         break;
 
       case 'error':
+        this.show();
         this.terminal.writeln(`\x1b[31m${event.data}\x1b[0m`);
         this.showMobileInput = false;
         this.mobileInputValue = '';
