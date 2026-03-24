@@ -172,10 +172,13 @@ import { RunState } from '../../core/models/run-state.model';
         @if (terminalVisible) {
           <button
             [class.active]="mobileTab === 'terminal'"
-            (click)="mobileTab = 'terminal'"
+            (click)="switchToTerminalTab()"
             data-testid="terminal-tab"
           >
             Terminal
+            @if (hasUnreadOutput && mobileTab !== 'terminal') {
+              <span class="tab-badge"></span>
+            }
           </button>
         }
         <button
@@ -207,7 +210,7 @@ import { RunState } from '../../core/models/run-state.model';
               />
             }
           </div>
-          <app-terminal />
+          <app-terminal (unreadOutput)="onTerminalUnreadOutput()" />
         </div>
 
         <!-- Leaderboard (mobile only) -->
@@ -286,16 +289,46 @@ import { RunState } from '../../core/models/run-state.model';
       }
     </div>
 
+    <!-- Input waiting toast (phone, when not on terminal tab) -->
+    @if (showInputToast) {
+      <div class="input-toast" (click)="switchToTerminalTab()">
+        Program is waiting for your input
+      </div>
+    }
+
+    <!-- Screen reader live region -->
+    <div id="sr-announcer"
+         aria-live="assertive"
+         aria-atomic="true"
+         class="sr-only">
+    </div>
+
     <app-celebration #celebration />
   `,
   styles: [
     `
       :host {
         display: block;
-        height: 100vh;
+        height: 100dvh;
         background: #0f0c29;
         color: #fff;
         overflow: hidden;
+      }
+
+      @supports not (height: 100dvh) {
+        :host { height: 100vh; }
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
       }
 
       .overlay {
@@ -482,6 +515,38 @@ import { RunState } from '../../core/models/run-state.model';
       .mobile-tabs {
         display: none;
         flex-shrink: 0;
+      }
+
+      .tab-badge {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #ff4757;
+        margin-left: 4px;
+        vertical-align: super;
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+
+      .input-toast {
+        position: fixed;
+        bottom: 70px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(79, 195, 247, 0.15);
+        border: 1px solid rgba(79, 195, 247, 0.3);
+        border-radius: 8px;
+        padding: 0.6rem 1rem;
+        color: #4fc3f7;
+        font-size: 0.85rem;
+        cursor: pointer;
+        z-index: 80;
+        animation: fadeIn 0.3s ease-out;
       }
 
       /* Content Area */
@@ -729,6 +794,33 @@ import { RunState } from '../../core/models/run-state.model';
         .mini-leaderboard {
           display: none;
         }
+
+        .bottom-bar .btn,
+        .bottom-bar .btn-run,
+        .bottom-bar .btn-stop {
+          min-height: 44px;
+          min-width: 44px;
+          font-size: 16px;
+          padding: 10px 20px;
+        }
+      }
+
+      /* Tablet breakpoint (600-1023px) */
+      @media (min-width: 600px) and (max-width: 1023px) {
+        .content {
+          flex-direction: column;
+        }
+
+        .panel.challenge {
+          width: 100%;
+          max-height: 25vh;
+          border-right: none;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .panel.editor {
+          width: 100%;
+        }
       }
     `,
   ],
@@ -750,6 +842,8 @@ export class CodingComponent implements OnInit, OnDestroy {
   // Run state
   isRunActive = false;
   terminalVisible = false;
+  hasUnreadOutput = false;
+  showInputToast = false;
 
   // Electron kiosk state
   isElectron = false;
@@ -871,6 +965,26 @@ export class CodingComponent implements OnInit, OnDestroy {
           rs === RunState.Compiling;
         if (rs === RunState.Compiling) {
           this.terminalVisible = true;
+          // Auto-switch to terminal tab on phone
+          if (window.innerWidth < 600) {
+            this.mobileTab = 'terminal';
+          }
+        }
+        if (rs === RunState.WaitingForInput && this.mobileTab !== 'terminal' && window.innerWidth < 600) {
+          this.showInputToast = true;
+          setTimeout(() => (this.showInputToast = false), 5000);
+        }
+        if (rs === RunState.Finished || rs === RunState.Error || rs === RunState.Idle) {
+          this.showInputToast = false;
+        }
+      })
+    );
+
+    // Reconnection handling — reconnect to active run
+    this.subs.push(
+      this.signalr.reconnected$.subscribe(() => {
+        if (this.state?.sessionCode) {
+          this.signalr.reconnectToRun(this.state.sessionCode);
         }
       })
     );
@@ -905,6 +1019,18 @@ export class CodingComponent implements OnInit, OnDestroy {
       await this.signalr.stopRun(this.state.sessionCode);
     } catch (err) {
       console.error('Stop failed:', err);
+    }
+  }
+
+  switchToTerminalTab(): void {
+    this.mobileTab = 'terminal';
+    this.hasUnreadOutput = false;
+    this.showInputToast = false;
+  }
+
+  onTerminalUnreadOutput(): void {
+    if (this.mobileTab !== 'terminal') {
+      this.hasUnreadOutput = true;
     }
   }
 

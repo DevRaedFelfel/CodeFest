@@ -3,6 +3,7 @@ using CodeFest.Api.DTOs;
 using CodeFest.Api.Hubs;
 using CodeFest.Api.Models;
 using CodeFest.Api.Services;
+using CodeFest.Api.Tests.Helpers;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +19,7 @@ namespace CodeFest.Api.Tests.Services;
 /// </summary>
 public class InteractiveRunIntegrationTests : IDisposable
 {
+    static InteractiveRunIntegrationTests() => PerSessionConsoleFixture.EnsureInstalled();
     private readonly ConcurrentQueue<(string method, object?[] args)> _sentMessages = new();
     private readonly InteractiveRunService _service;
 

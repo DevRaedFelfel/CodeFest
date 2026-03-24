@@ -4,6 +4,7 @@ import { RunStateService } from '../../../core/services/run-state.service';
 import { SignalrService } from '../../../core/services/signalr.service';
 import { SessionService } from '../../../core/services/session.service';
 import { RunState } from '../../../core/models/run-state.model';
+import { Subject } from 'rxjs';
 
 describe('TerminalComponent', () => {
   let component: TerminalComponent;
@@ -22,7 +23,11 @@ describe('TerminalComponent', () => {
       'stopRun',
       'connect',
       'runCode',
-    ]);
+      'reconnectToRun',
+    ], {
+      reconnecting$: new Subject<void>(),
+      reconnected$: new Subject<void>(),
+    });
 
     await TestBed.configureTestingModule({
       imports: [TerminalComponent],

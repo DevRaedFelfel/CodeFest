@@ -12,6 +12,7 @@ namespace CodeFest.Api.Services;
 public class InteractiveRunService : IDisposable
 {
     private readonly ConcurrentDictionary<int, RunSession> _activeSessions = new();
+    private readonly ConcurrentDictionary<int, CancellationTokenSource> _graceTimers = new();
     private readonly IHubContext<CodeFestHub> _hubContext;
     private readonly ILogger<InteractiveRunService> _logger;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -151,7 +152,51 @@ public class InteractiveRunService : IDisposable
 
     public async Task OnStudentDisconnectedAsync(int studentId)
     {
-        await StopRunAsync(studentId);
+        if (HasActiveRun(studentId))
+        {
+            // Start grace period instead of killing immediately
+            _ = StartDisconnectGracePeriodAsync(studentId, gracePeriodSeconds: 15);
+        }
+    }
+
+    public async Task StartDisconnectGracePeriodAsync(int studentId, int gracePeriodSeconds)
+    {
+        // Cancel any existing grace timer
+        if (_graceTimers.TryRemove(studentId, out var existingCts))
+            existingCts.Cancel();
+
+        var graceCts = new CancellationTokenSource();
+        _graceTimers[studentId] = graceCts;
+
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(gracePeriodSeconds), graceCts.Token);
+
+            // Grace period expired — student didn't reconnect
+            _graceTimers.TryRemove(studentId, out _);
+            await StopRunAsync(studentId);
+        }
+        catch (OperationCanceledException)
+        {
+            // Student reconnected in time — do nothing
+        }
+    }
+
+    public void OnStudentReconnected(int studentId, string newConnectionId)
+    {
+        // Cancel grace timer
+        if (_graceTimers.TryRemove(studentId, out var graceCts))
+            graceCts.Cancel();
+
+        // Update the active session's connection ID
+        if (_activeSessions.TryGetValue(studentId, out var session))
+        {
+            session.ConnectionId = newConnectionId;
+
+            // Notify client the run is still alive
+            _ = _hubContext.Clients.Client(newConnectionId)
+                .SendAsync("RunResumed", session.State.ToString());
+        }
     }
 
     public async Task StopAllRunsForSessionAsync(IEnumerable<int> studentIds)
@@ -191,9 +236,6 @@ public class InteractiveRunService : IDisposable
 
         try
         {
-            var originalIn = Console.In;
-            var originalOut = Console.Out;
-
             var notifyingReader = new NotifyingTextReader(
                 stdinReader,
                 onWaiting: () =>
@@ -204,49 +246,50 @@ public class InteractiveRunService : IDisposable
                 },
                 waitDetectionMs: InputWaitDetectionMs);
 
-            Console.SetIn(notifyingReader);
-            Console.SetOut(signalrWriter);
-
-            try
+            var entryPoint = compiledAssembly.EntryPoint;
+            if (entryPoint == null)
             {
-                var entryPoint = compiledAssembly.EntryPoint;
-                if (entryPoint == null)
-                {
-                    await _hubContext.Clients.Client(session.ConnectionId)
-                        .SendAsync("RunError", "No entry point found (Main method missing).");
-                    session.State = RunSessionState.Error;
-                    await _hubContext.Clients.Client(session.ConnectionId)
-                        .SendAsync("RunFinished", -1);
-                    return;
-                }
+                await _hubContext.Clients.Client(session.ConnectionId)
+                    .SendAsync("RunError", "No entry point found (Main method missing).");
+                session.State = RunSessionState.Error;
+                await _hubContext.Clients.Client(session.ConnectionId)
+                    .SendAsync("RunFinished", -1);
+                return;
+            }
 
-                using var timeoutCts = CancellationTokenSource
-                    .CreateLinkedTokenSource(session.Cts.Token);
-                timeoutCts.CancelAfter(TimeSpan.FromSeconds(MaxRunTimeSeconds));
+            using var timeoutCts = CancellationTokenSource
+                .CreateLinkedTokenSource(session.Cts.Token);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(MaxRunTimeSeconds));
 
-                var task = Task.Run(() =>
+            // Use AsyncLocal-based Console redirection so each student's
+            // Task.Run gets its own isolated stdin/stdout streams.
+            var task = Task.Run(() =>
+            {
+                PerSessionConsoleOut.SetWriter(signalrWriter);
+                PerSessionConsoleIn.SetReader(notifyingReader);
+                try
                 {
                     var parameters = entryPoint.GetParameters();
                     var args = parameters.Length > 0
                         ? new object[] { Array.Empty<string>() }
                         : null;
                     entryPoint.Invoke(null, args);
-                }, timeoutCts.Token);
+                }
+                finally
+                {
+                    PerSessionConsoleOut.ClearWriter();
+                    PerSessionConsoleIn.ClearReader();
+                }
+            }, timeoutCts.Token);
 
-                await task;
+            await task;
 
-                // Flush any remaining buffered output
-                signalrWriter.Dispose();
+            // Flush any remaining buffered output
+            signalrWriter.Dispose();
 
-                session.State = RunSessionState.Finished;
-                await _hubContext.Clients.Client(session.ConnectionId)
-                    .SendAsync("RunFinished", 0);
-            }
-            finally
-            {
-                Console.SetIn(originalIn);
-                Console.SetOut(originalOut);
-            }
+            session.State = RunSessionState.Finished;
+            await _hubContext.Clients.Client(session.ConnectionId)
+                .SendAsync("RunFinished", 0);
         }
         catch (OperationCanceledException)
         {

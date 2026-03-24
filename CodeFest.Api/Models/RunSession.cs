@@ -4,7 +4,7 @@ public class RunSession : IDisposable
 {
     public string SessionId { get; init; } = string.Empty;
     public int StudentId { get; init; }
-    public string ConnectionId { get; init; } = string.Empty;
+    public string ConnectionId { get; set; } = string.Empty;
     public int ChallengeId { get; init; }
 
     public CancellationTokenSource Cts { get; } = new();

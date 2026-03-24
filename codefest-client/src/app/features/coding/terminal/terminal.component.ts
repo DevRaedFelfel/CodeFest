@@ -5,14 +5,19 @@ import {
   ViewChild,
   ElementRef,
   AfterViewInit,
+  Output,
+  EventEmitter,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { RunStateService } from '../../../core/services/run-state.service';
 import {
-  RunStateService,
-} from '../../../core/services/run-state.service';
-import { RunState, RunEvent, CompileError } from '../../../core/models/run-state.model';
+  RunState,
+  RunEvent,
+  CompileError,
+} from '../../../core/models/run-state.model';
 import { SignalrService } from '../../../core/services/signalr.service';
 import { SessionService } from '../../../core/services/session.service';
 import { Subscription } from 'rxjs';
@@ -20,7 +25,7 @@ import { Subscription } from 'rxjs';
 @Component({
   selector: 'app-terminal',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div
       class="terminal-container"
@@ -30,6 +35,16 @@ import { Subscription } from 'rxjs';
       <div class="terminal-header">
         <span class="terminal-title">Terminal</span>
         <div class="terminal-actions">
+          @if (isTouchDevice()) {
+            <button
+              class="btn-terminal"
+              (click)="copyOutput()"
+              title="Copy terminal output"
+              data-testid="copy-output-button"
+            >
+              Copy
+            </button>
+          }
           <button
             class="btn-terminal"
             (click)="clear()"
@@ -51,6 +66,33 @@ import { Subscription } from 'rxjs';
         </div>
       </div>
       <div class="terminal-body" #terminalContainer></div>
+
+      <!-- Mobile input bar -->
+      <div
+        class="mobile-input-bar"
+        [class.hidden]="!showMobileInput"
+        data-testid="mobile-input-bar"
+      >
+        <input
+          #mobileInput
+          type="text"
+          placeholder="Type your input..."
+          [(ngModel)]="mobileInputValue"
+          (keydown.enter)="submitMobileInput()"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          data-testid="mobile-input-field"
+        />
+        <button
+          class="send-btn"
+          (click)="submitMobileInput()"
+          data-testid="mobile-send-button"
+        >
+          Send
+        </button>
+      </div>
     </div>
   `,
   styles: [
@@ -124,12 +166,96 @@ import { Subscription } from 'rxjs';
       :host ::ng-deep .xterm {
         height: 100%;
       }
+
+      /* Mobile input bar — hidden by default, shown on touch devices when waiting */
+      .mobile-input-bar {
+        display: none;
+      }
+
+      .mobile-input-bar.hidden {
+        display: none !important;
+      }
+
+      @media (pointer: coarse) {
+        .mobile-input-bar {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 12px;
+          background: #2d2d2d;
+          border-top: 1px solid #444;
+        }
+
+        .mobile-input-bar.hidden {
+          display: none !important;
+        }
+
+        .mobile-input-bar input {
+          flex: 1;
+          padding: 8px 12px;
+          font-size: 16px; /* >=16px prevents iOS zoom on focus */
+          font-family: 'JetBrains Mono', Consolas, monospace;
+          background: #1e1e1e;
+          border: 1px solid #555;
+          border-radius: 4px;
+          color: #4fc3f7;
+          outline: none;
+          -webkit-text-size-adjust: none;
+        }
+
+        .mobile-input-bar input:focus {
+          border-color: #4fc3f7;
+        }
+
+        .send-btn {
+          flex: 0 0 auto;
+          padding: 8px 16px;
+          font-size: 14px;
+          font-weight: 600;
+          background: #4fc3f7;
+          color: #1e1e1e;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+
+        .send-btn:active {
+          background: #29b6f6;
+        }
+      }
+
+      /* Larger touch targets on mobile */
+      @media (pointer: coarse) {
+        .btn-terminal {
+          min-height: 36px;
+          min-width: 36px;
+          padding: 4px 12px;
+          font-size: 13px;
+        }
+      }
+
+      /* Screen reader only */
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
     `,
   ],
 })
 export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('terminalContainer', { static: true })
   terminalContainer!: ElementRef<HTMLDivElement>;
+  @ViewChild('mobileInput')
+  mobileInputRef?: ElementRef<HTMLInputElement>;
+
+  @Output() unreadOutput = new EventEmitter<boolean>();
 
   private terminal!: Terminal;
   private fitAddon!: FitAddon;
@@ -138,9 +264,12 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
   private isInputMode = false;
   private runCount = 0;
   private resizeObserver?: ResizeObserver;
+  private visibilityHandler?: () => void;
 
   isVisible = false;
   isRunning = false;
+  showMobileInput = false;
+  mobileInputValue = '';
 
   constructor(
     private runState: RunStateService,
@@ -150,13 +279,19 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit(): void {
     this.subscribeToEvents();
+    this.setupVisibilityHandler();
   }
 
   ngAfterViewInit(): void {
     this.initTerminal();
+    this.setupViewportResize();
+    this.setupContextMenuPrevention();
   }
 
   private initTerminal(): void {
+    const isTouch = this.isTouchDevice();
+    const isCapacitor = this.isCapacitor();
+
     this.terminal = new Terminal({
       theme: {
         background: '#1E1E1E',
@@ -169,7 +304,7 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
       lineHeight: 1.4,
       cursorBlink: true,
       cursorStyle: 'bar',
-      scrollback: 500,
+      scrollback: isTouch ? 200 : 500,
       convertEol: true,
       disableStdin: true,
     });
@@ -180,7 +315,12 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
     this.terminal.open(this.terminalContainer.nativeElement);
     this.fitAddon.fit();
 
-    // Handle keyboard input
+    // Allow touch scrolling in Capacitor/mobile
+    if (isTouch) {
+      this.terminal.options.scrollOnUserInput = false;
+    }
+
+    // Handle keyboard input (desktop only — mobile uses input bar)
     this.terminal.onKey(({ key, domEvent }) => {
       if (!this.isInputMode) return;
 
@@ -195,7 +335,6 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
         this.stop();
       } else if (key.length === 1 && !domEvent.ctrlKey && !domEvent.altKey) {
         this.inputBuffer += key;
-        // Echo in input color (light blue)
         this.terminal.write(`\x1b[38;2;79;195;247m${key}\x1b[0m`);
       }
     });
@@ -211,6 +350,56 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
     this.resizeObserver.observe(this.terminalContainer.nativeElement);
   }
 
+  private setupViewportResize(): void {
+    if (!this.isTouchDevice()) return;
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        this.onViewportResize();
+      });
+    }
+  }
+
+  private onViewportResize(): void {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const keyboardHeight = window.innerHeight - vv.height;
+
+    if (keyboardHeight > 100) {
+      // Keyboard is open — shrink terminal
+      this.terminalContainer.nativeElement.style.maxHeight = `${vv.height - 120}px`;
+    } else {
+      // Keyboard closed
+      this.terminalContainer.nativeElement.style.maxHeight = '';
+    }
+
+    try {
+      this.fitAddon.fit();
+    } catch {}
+  }
+
+  private setupContextMenuPrevention(): void {
+    if (this.isTouchDevice()) {
+      this.terminalContainer.nativeElement.addEventListener(
+        'contextmenu',
+        (e: Event) => e.preventDefault()
+      );
+    }
+  }
+
+  private setupVisibilityHandler(): void {
+    this.visibilityHandler = () => {
+      if (document.visibilityState === 'visible' && this.terminal) {
+        this.terminal.scrollToBottom();
+        try {
+          this.fitAddon?.fit();
+        } catch {}
+      }
+    };
+    document.addEventListener('visibilitychange', this.visibilityHandler);
+  }
+
   private subscribeToEvents(): void {
     this.subscriptions.add(
       this.runState.events$.subscribe((event) => this.handleRunEvent(event))
@@ -222,6 +411,27 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
           state === RunState.Running ||
           state === RunState.WaitingForInput ||
           state === RunState.Compiling;
+
+        this.manageFocusOnStateChange(state);
+      })
+    );
+
+    // Reconnection messages
+    this.subscriptions.add(
+      this.signalr.reconnecting$.subscribe(() => {
+        if (this.terminal && this.isVisible) {
+          this.terminal.writeln(
+            '\x1b[33m\u26A0 Connection lost \u2014 reconnecting...\x1b[0m'
+          );
+        }
+      })
+    );
+
+    this.subscriptions.add(
+      this.signalr.reconnected$.subscribe(() => {
+        if (this.terminal && this.isVisible) {
+          this.terminal.writeln('\x1b[32m\u2713 Reconnected\x1b[0m');
+        }
       })
     );
   }
@@ -237,6 +447,7 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
           );
         }
         this.terminal.writeln('\x1b[90mCompiling...\x1b[0m');
+        this.announce('Compiling your code');
         break;
 
       case 'started':
@@ -245,15 +456,26 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
 
       case 'output':
         this.terminal.write(event.data as string);
+        this.unreadOutput.emit(true);
         break;
 
       case 'waiting':
-        this.enableInputMode();
+        if (this.isTouchDevice()) {
+          this.showMobileInput = true;
+          setTimeout(
+            () => this.mobileInputRef?.nativeElement.focus(),
+            100
+          );
+        } else {
+          this.enableInputMode();
+        }
+        this.announce('Program is waiting for your input');
         break;
 
       case 'inputEcho':
-        // Input was already echoed character-by-character during typing
         this.terminal.writeln('');
+        this.showMobileInput = false;
+        this.mobileInputValue = '';
         this.disableInputMode();
         break;
 
@@ -263,7 +485,10 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
 
       case 'error':
         this.terminal.writeln(`\x1b[31m${event.data}\x1b[0m`);
+        this.showMobileInput = false;
+        this.mobileInputValue = '';
         this.disableInputMode();
+        this.announce(`Error: ${event.data}`);
         break;
 
       case 'finished': {
@@ -273,7 +498,10 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
         this.terminal.writeln(
           `\x1b[${color}m--- Program ended (exit code ${exitCode}) ---\x1b[0m`
         );
+        this.showMobileInput = false;
+        this.mobileInputValue = '';
         this.disableInputMode();
+        this.announce(`Program finished with exit code ${exitCode}`);
         break;
       }
 
@@ -299,6 +527,16 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
     const input = this.inputBuffer;
     this.inputBuffer = '';
     this.isInputMode = false;
+    this.signalr.sendRunInput(this.session.snapshot.sessionCode, input);
+  }
+
+  submitMobileInput(): void {
+    const input = this.mobileInputValue;
+    this.mobileInputValue = '';
+    this.showMobileInput = false;
+
+    // Echo in terminal
+    this.terminal.write(`\x1b[36m${input}\x1b[0m\n`);
 
     this.signalr.sendRunInput(this.session.snapshot.sessionCode, input);
   }
@@ -313,6 +551,44 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
     this.terminal.writeln('\x1b[31m════════════════════\x1b[0m');
   }
 
+  private manageFocusOnStateChange(state: RunState): void {
+    if (!this.isTouchDevice()) return;
+
+    switch (state) {
+      case RunState.WaitingForInput:
+        setTimeout(
+          () => this.mobileInputRef?.nativeElement.focus(),
+          100
+        );
+        break;
+      case RunState.Finished:
+      case RunState.Error: {
+        const runBtn = document.querySelector<HTMLElement>(
+          '[data-testid="run-button"]'
+        );
+        runBtn?.focus();
+        break;
+      }
+    }
+  }
+
+  private announce(message: string): void {
+    const announcer = document.getElementById('sr-announcer');
+    if (announcer) {
+      announcer.textContent = message;
+    }
+  }
+
+  copyOutput(): void {
+    const buffer = this.terminal.buffer.active;
+    let text = '';
+    for (let i = 0; i < buffer.length; i++) {
+      const line = buffer.getLine(i);
+      if (line) text += line.translateToString(true) + '\n';
+    }
+    navigator.clipboard.writeText(text.trim()).catch(() => {});
+  }
+
   show(): void {
     this.isVisible = true;
   }
@@ -324,12 +600,25 @@ export class TerminalComponent implements OnInit, AfterViewInit, OnDestroy {
 
   stop(): void {
     this.signalr.stopRun(this.session.snapshot.sessionCode);
+    this.showMobileInput = false;
+    this.mobileInputValue = '';
     this.disableInputMode();
+  }
+
+  isTouchDevice(): boolean {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  }
+
+  private isCapacitor(): boolean {
+    return !!(window as any).Capacitor;
   }
 
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
     this.resizeObserver?.disconnect();
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+    }
     this.terminal?.dispose();
   }
 }

@@ -391,6 +391,14 @@ public class CodeFestHub : Hub
             .SendAsync("StudentRunStopped", student.Id);
     }
 
+    public async Task ReconnectToRun(string sessionCode)
+    {
+        var student = await _sessionService.GetStudentByConnectionIdAsync(Context.ConnectionId);
+        if (student == null) return;
+
+        _interactiveRunService.OnStudentReconnected(student.Id, Context.ConnectionId);
+    }
+
     // --- Connection Lifecycle ---
 
     public override async Task OnDisconnectedAsync(Exception? exception)

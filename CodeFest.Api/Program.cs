@@ -26,7 +26,11 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
 
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    options.KeepAliveInterval = TimeSpan.FromSeconds(10);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -43,6 +47,11 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Install per-session Console wrappers so concurrent student runs
+// get isolated stdin/stdout via AsyncLocal (not global Console.SetIn/SetOut)
+Console.SetOut(new CodeFest.Api.Services.PerSessionConsoleOut(Console.Out));
+Console.SetIn(new CodeFest.Api.Services.PerSessionConsoleIn(Console.In));
 
 // Apply migrations on startup
 try

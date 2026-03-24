@@ -49,6 +49,14 @@ export class SignalrService {
   sessionDeleted$ = new Subject<void>();
   sessionReopened$ = new Subject<void>();
 
+  // Output throttling for low-end devices
+  private outputBuffer = '';
+  private outputFlushTimer: any = null;
+
+  // Reconnection terminal messages
+  reconnecting$ = new Subject<void>();
+  reconnected$ = new Subject<void>();
+
   constructor(
     private zone: NgZone,
     private runState: RunStateService
@@ -64,11 +72,17 @@ export class SignalrService {
     this.registerHandlers();
 
     this.hubConnection.onreconnecting(() => {
-      this.zone.run(() => this.connected$.next(false));
+      this.zone.run(() => {
+        this.connected$.next(false);
+        this.reconnecting$.next();
+      });
     });
 
-    this.hubConnection.onreconnected(() => {
-      this.zone.run(() => this.connected$.next(true));
+    this.hubConnection.onreconnected(async () => {
+      this.zone.run(() => {
+        this.connected$.next(true);
+        this.reconnected$.next();
+      });
     });
 
     this.hubConnection.onclose(() => {
@@ -135,7 +149,20 @@ export class SignalrService {
     on('RunStarted', (runId: string) =>
       this.runState.handleRunStarted(runId)
     );
-    on('RunOutput', (text: string) => this.runState.handleRunOutput(text));
+    on('RunOutput', (text: string) => {
+      if (this.isLowEndDevice()) {
+        this.outputBuffer += text;
+        if (!this.outputFlushTimer) {
+          this.outputFlushTimer = setTimeout(() => {
+            this.runState.handleRunOutput(this.outputBuffer);
+            this.outputBuffer = '';
+            this.outputFlushTimer = null;
+          }, 32); // ~30fps
+        }
+      } else {
+        this.runState.handleRunOutput(text);
+      }
+    });
     on('RunWaiting', () => this.runState.handleRunWaiting());
     on('RunInputEcho', (text: string) =>
       this.runState.handleRunInputEcho(text)
@@ -149,6 +176,13 @@ export class SignalrService {
     on('RunFinished', (exitCode: number) =>
       this.runState.handleRunFinished(exitCode)
     );
+    on('RunResumed', (state: string) => {
+      if (state === 'WaitingForInput') {
+        this.runState.handleRunWaiting();
+      } else if (state === 'Running') {
+        this.runState.handleRunStarted('resumed');
+      }
+    });
 
     // Interactive run handlers (teacher-side)
     on('StudentRunStarted', (studentId: number, challengeId: number) =>
@@ -302,6 +336,18 @@ export class SignalrService {
 
   async stopRun(sessionCode: string): Promise<void> {
     return this.hubConnection.invoke('StopRun', sessionCode);
+  }
+
+  async reconnectToRun(sessionCode: string): Promise<void> {
+    if (this.hubConnection.state === HubConnectionState.Connected) {
+      return this.hubConnection.invoke('ReconnectToRun', sessionCode);
+    }
+  }
+
+  private isLowEndDevice(): boolean {
+    const memory = (navigator as any).deviceMemory;
+    const cores = navigator.hardwareConcurrency;
+    return (memory && memory <= 2) || (cores && cores <= 4);
   }
 
   async disconnect(): Promise<void> {

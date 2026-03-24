@@ -3,6 +3,7 @@ using CodeFest.Api.DTOs;
 using CodeFest.Api.Hubs;
 using CodeFest.Api.Models;
 using CodeFest.Api.Services;
+using CodeFest.Api.Tests.Helpers;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,7 @@ namespace CodeFest.Api.Tests.Services;
 
 public class InteractiveRunServiceTests : IDisposable
 {
+    static InteractiveRunServiceTests() => PerSessionConsoleFixture.EnsureInstalled();
     private readonly ConcurrentQueue<(string method, object?[] args)> _sentMessages = new();
     private readonly InteractiveRunService _service;
 
@@ -185,7 +187,7 @@ public class InteractiveRunServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task OnStudentDisconnected_KillsActiveRun()
+    public async Task OnStudentDisconnected_StartsGracePeriod()
     {
         var code = """
             using System;
@@ -196,8 +198,16 @@ public class InteractiveRunServiceTests : IDisposable
         await Task.Delay(300);
         _service.HasActiveRun(1).Should().BeTrue();
 
+        // OnStudentDisconnectedAsync now starts a grace period
+        // (not an immediate kill)
         await _service.OnStudentDisconnectedAsync(1);
 
+        // Run should still be active during grace period
+        await Task.Delay(500);
+        _service.HasActiveRun(1).Should().BeTrue();
+
+        // Use StopRunAsync directly for immediate kill
+        await _service.StopRunAsync(1);
         await Task.Delay(500);
         _service.HasActiveRun(1).Should().BeFalse();
     }
