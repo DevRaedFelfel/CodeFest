@@ -10,17 +10,20 @@ public class CodeFestHub : Hub
     private readonly ChallengeService _challengeService;
     private readonly ActivityLogService _activityLog;
     private readonly CodeExecutionService _executor;
+    private readonly InteractiveRunService _interactiveRunService;
 
     public CodeFestHub(
         SessionService sessionService,
         ChallengeService challengeService,
         ActivityLogService activityLog,
-        CodeExecutionService executor)
+        CodeExecutionService executor,
+        InteractiveRunService interactiveRunService)
     {
         _sessionService = sessionService;
         _challengeService = challengeService;
         _activityLog = activityLog;
         _executor = executor;
+        _interactiveRunService = interactiveRunService;
     }
 
     // --- Teacher Actions ---
@@ -339,6 +342,55 @@ public class CodeFestHub : Hub
         });
     }
 
+    // --- Interactive Run ---
+
+    public async Task RunCode(string sessionCode, int challengeId, string code)
+    {
+        var student = await _sessionService.GetStudentByConnectionIdAsync(Context.ConnectionId);
+        if (student == null) return;
+
+        var challenge = await _challengeService.GetByIdAsync(challengeId);
+        if (challenge == null) return;
+
+        await _activityLog.LogAsync(student.Id, student.SessionId,
+            ActivityType.InteractiveRun, $"{{\"challengeId\":{challengeId},\"codeLength\":{code.Length}}}");
+
+        await _interactiveRunService.StartRunAsync(
+            student.Id,
+            Context.ConnectionId,
+            challengeId,
+            code,
+            challenge.PatternChecks);
+
+        await Clients.Group($"teacher-{sessionCode}")
+            .SendAsync("StudentRunStarted", student.Id, challengeId);
+    }
+
+    public async Task SendRunInput(string sessionCode, string input)
+    {
+        var student = await _sessionService.GetStudentByConnectionIdAsync(Context.ConnectionId);
+        if (student == null) return;
+
+        await _interactiveRunService.SendInputAsync(student.Id, input);
+
+        await _activityLog.LogAsync(student.Id, student.SessionId,
+            ActivityType.InteractiveRunInput, $"{{\"inputLength\":{input.Length}}}");
+    }
+
+    public async Task StopRun(string sessionCode)
+    {
+        var student = await _sessionService.GetStudentByConnectionIdAsync(Context.ConnectionId);
+        if (student == null) return;
+
+        await _interactiveRunService.StopRunAsync(student.Id);
+
+        await _activityLog.LogAsync(student.Id, student.SessionId,
+            ActivityType.InteractiveRunStop);
+
+        await Clients.Group($"teacher-{sessionCode}")
+            .SendAsync("StudentRunStopped", student.Id);
+    }
+
     // --- Connection Lifecycle ---
 
     public override async Task OnDisconnectedAsync(Exception? exception)
@@ -346,6 +398,9 @@ public class CodeFestHub : Hub
         var student = await _sessionService.GetStudentByConnectionIdAsync(Context.ConnectionId);
         if (student != null)
         {
+            // Kill any active interactive run
+            await _interactiveRunService.OnStudentDisconnectedAsync(student.Id);
+
             await _sessionService.DisconnectStudentAsync(Context.ConnectionId);
             await _activityLog.LogAsync(student.Id, student.SessionId, ActivityType.Disconnected);
 

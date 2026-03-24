@@ -102,6 +102,7 @@ import { SessionCreatorComponent } from './session-creator/session-creator.compo
             <app-student-grid
               [students]="students"
               [totalChallenges]="currentSession.challengeIds?.length ?? 0"
+              [runStatuses]="studentRunStatuses"
               (selectStudent)="onSelectStudent($event)"
             />
           </div>
@@ -406,6 +407,7 @@ export class TeacherComponent implements OnInit, OnDestroy {
   leaderboard: LeaderboardEntry[] = [];
 
   showCreator = false;
+  studentRunStatuses: Record<number, string> = {};
 
   selectedStudentName = '';
   selectedStudentCode = '';
@@ -432,7 +434,20 @@ export class TeacherComponent implements OnInit, OnDestroy {
       ),
       this.teacherService.leaderboard$.subscribe(
         (l) => (this.leaderboard = l)
-      )
+      ),
+      this.signalr.studentRunStarted$.subscribe(({ studentId }) => {
+        this.studentRunStatuses = { ...this.studentRunStatuses, [studentId]: 'running' };
+      }),
+      this.signalr.studentRunStopped$.subscribe((studentId) => {
+        const { [studentId]: _, ...rest } = this.studentRunStatuses;
+        this.studentRunStatuses = rest;
+      }),
+      this.signalr.activityLogged$.subscribe((activity) => {
+        if (activity.ActivityType === 'InteractiveRunStop') {
+          const { [activity.Id]: _, ...rest } = this.studentRunStatuses;
+          this.studentRunStatuses = rest;
+        }
+      })
     );
   }
 

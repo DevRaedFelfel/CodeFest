@@ -28,5 +28,8 @@ public enum ActivityType
     FullscreenExited,
     FullscreenResumed,
     HintRequested,
-    ChatMessage
+    ChatMessage,
+    InteractiveRun,
+    InteractiveRunInput,
+    InteractiveRunStop
 }

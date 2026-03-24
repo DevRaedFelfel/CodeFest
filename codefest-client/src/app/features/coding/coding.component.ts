@@ -5,6 +5,7 @@ import { Subscription } from 'rxjs';
 import { SessionService, SessionState } from '../../core/services/session.service';
 import { SignalrService } from '../../core/services/signalr.service';
 import { ActivityTrackerService } from '../../core/services/activity-tracker.service';
+import { KioskService } from '../../core/services/kiosk.service';
 import { SessionStatus } from '../../core/models/session.model';
 import { CodeEditorComponent } from './editor/code-editor.component';
 import { ChallengePanelComponent } from './challenge-panel/challenge-panel.component';
@@ -12,6 +13,9 @@ import { TestResultsComponent } from './test-results/test-results.component';
 import { TimerComponent } from './timer/timer.component';
 import { LeaderboardComponent } from './leaderboard/leaderboard.component';
 import { CelebrationComponent } from '../../shared/components/celebration.component';
+import { TerminalComponent } from './terminal/terminal.component';
+import { RunStateService } from '../../core/services/run-state.service';
+import { RunState } from '../../core/models/run-state.model';
 
 @Component({
   selector: 'app-coding',
@@ -24,8 +28,48 @@ import { CelebrationComponent } from '../../shared/components/celebration.compon
     TimerComponent,
     LeaderboardComponent,
     CelebrationComponent,
+    TerminalComponent,
   ],
   template: `
+    <!-- Multi-Monitor Warning Overlay (Electron) -->
+    @if (showMonitorWarning) {
+      <div class="overlay monitor-warning">
+        <div class="overlay-card warning-card">
+          <div class="warning-icon">&#9888;</div>
+          <h2>WARNING</h2>
+          <p>An additional monitor has been detected.</p>
+          <p>Please disconnect all extra monitors to continue your exam.</p>
+          <p class="warning-note">This event has been logged and reported to your instructor.</p>
+          <div class="spinner"></div>
+          <p class="waiting">Waiting for single monitor...</p>
+        </div>
+      </div>
+    }
+
+    <!-- Exit Confirmation Dialog (Electron) -->
+    @if (showExitConfirm) {
+      <div class="overlay">
+        <div class="overlay-card">
+          <h2>Are you sure?</h2>
+          <p>Your current code will be submitted for all challenges. You cannot re-enter the exam after leaving.</p>
+          <div class="exit-buttons">
+            <button class="btn btn-secondary" (click)="cancelExit()">Cancel</button>
+            <button class="btn btn-danger" (click)="confirmExit()">Submit &amp; Exit</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Submitting Overlay (Electron exit flow) -->
+    @if (exitSubmitting) {
+      <div class="overlay">
+        <div class="overlay-card">
+          <h2>Submitting your work...</h2>
+          <div class="spinner"></div>
+        </div>
+      </div>
+    }
+
     <!-- Session Ended Overlay -->
     @if (state.status === SessionStatus.Ended) {
       <div class="overlay">
@@ -36,6 +80,9 @@ import { CelebrationComponent } from '../../shared/components/celebration.compon
             [entries]="state.leaderboard"
             [currentStudentId]="state.studentId"
           />
+          @if (isElectron) {
+            <button class="btn btn-primary exit-btn" (click)="electronSessionEndExit()">Exit</button>
+          }
         </div>
       </div>
     }
@@ -122,6 +169,15 @@ import { CelebrationComponent } from '../../shared/components/celebration.compon
         >
           Code
         </button>
+        @if (terminalVisible) {
+          <button
+            [class.active]="mobileTab === 'terminal'"
+            (click)="mobileTab = 'terminal'"
+            data-testid="terminal-tab"
+          >
+            Terminal
+          </button>
+        }
         <button
           [class.active]="mobileTab === 'leaderboard'"
           (click)="mobileTab = 'leaderboard'"
@@ -141,14 +197,17 @@ import { CelebrationComponent } from '../../shared/components/celebration.compon
         </div>
 
         <!-- Editor Panel (right) -->
-        <div class="panel editor" [class.mobile-visible]="mobileTab === 'editor'">
-          @if (state.currentChallenge) {
-            <app-code-editor
-              [initialCode]="state.currentChallenge.starterCode"
-              [readOnly]="state.status !== SessionStatus.Active"
-              (codeChange)="onCodeChange($event)"
-            />
-          }
+        <div class="panel editor" [class.mobile-visible]="mobileTab === 'editor' || mobileTab === 'terminal'">
+          <div class="editor-area" (keydown)="onEditorKeydown($event)">
+            @if (state.currentChallenge) {
+              <app-code-editor
+                [initialCode]="state.currentChallenge.starterCode"
+                [readOnly]="state.status !== SessionStatus.Active"
+                (codeChange)="onCodeChange($event)"
+              />
+            }
+          </div>
+          <app-terminal />
         </div>
 
         <!-- Leaderboard (mobile only) -->
@@ -174,12 +233,43 @@ import { CelebrationComponent } from '../../shared/components/celebration.compon
           }
         </div>
         <div class="bottom-right">
+          @if (isElectron) {
+            <button
+              class="btn btn-exit"
+              (click)="requestExit()"
+              [disabled]="submitting || exitSubmitting"
+            >
+              Exit Exam
+            </button>
+          }
+          <button
+            class="btn btn-run"
+            (click)="runCode()"
+            [disabled]="isRunActive || state.status !== SessionStatus.Active"
+            data-testid="run-button"
+          >
+            @if (runState.currentState === RunState.Compiling) {
+              <span class="btn-spinner"></span> Compiling...
+            } @else {
+              &#9654; Run
+            }
+          </button>
+          @if (isRunActive) {
+            <button
+              class="btn btn-stop"
+              (click)="stopRun()"
+              data-testid="stop-button"
+            >
+              &#9632; Stop
+            </button>
+          }
           <button
             class="btn btn-primary"
             (click)="runTests()"
-            [disabled]="submitting || state.status !== SessionStatus.Active"
+            [disabled]="submitting || isRunActive || state.status !== SessionStatus.Active"
+            data-testid="submit-button"
           >
-            {{ submitting ? 'Running...' : 'Run Tests' }}
+            {{ submitting ? 'Submitting...' : '&#10003; Submit' }}
           </button>
         </div>
       </footer>
@@ -410,6 +500,14 @@ import { CelebrationComponent } from '../../shared/components/celebration.compon
       .panel.editor {
         width: 60%;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .editor-area {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
       }
 
       .panel.leaderboard-mobile {
@@ -465,9 +563,124 @@ import { CelebrationComponent } from '../../shared/components/celebration.compon
         transform: translateY(-1px);
       }
 
+      .btn-run {
+        background: rgba(46, 213, 115, 0.15);
+        color: #2ed573;
+        border: 1px solid rgba(46, 213, 115, 0.3);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+      }
+
+      .btn-run:hover:not(:disabled) {
+        background: rgba(46, 213, 115, 0.25);
+      }
+
+      .btn-run:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-stop {
+        background: rgba(255, 71, 87, 0.15);
+        color: #ff4757;
+        border: 1px solid rgba(255, 71, 87, 0.3);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+      }
+
+      .btn-stop:hover {
+        background: rgba(255, 71, 87, 0.25);
+      }
+
+      .btn-spinner {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(46, 213, 115, 0.3);
+        border-top-color: #2ed573;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        vertical-align: middle;
+        margin-right: 4px;
+      }
+
       /* Results */
       .results-container {
         flex-shrink: 0;
+      }
+
+      /* Electron kiosk styles */
+      .monitor-warning {
+        background: rgba(180, 30, 30, 0.95);
+      }
+
+      .warning-card {
+        border-color: rgba(255, 80, 80, 0.4);
+      }
+
+      .warning-icon {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .warning-note {
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.5);
+        margin-top: 1rem;
+      }
+
+      .exit-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-top: 1.5rem;
+      }
+
+      .btn-secondary {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .btn-secondary:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      .btn-danger {
+        background: #ff4757;
+        color: #fff;
+      }
+
+      .btn-danger:hover:not(:disabled) {
+        background: #ff6b6b;
+      }
+
+      .btn-exit {
+        background: rgba(255, 71, 87, 0.15);
+        color: #ff4757;
+        border: 1px solid rgba(255, 71, 87, 0.3);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+      }
+
+      .btn-exit:hover:not(:disabled) {
+        background: rgba(255, 71, 87, 0.25);
+      }
+
+      .exit-btn {
+        margin-top: 1.5rem;
       }
 
       /* Mobile responsive */
@@ -526,12 +739,23 @@ export class CodingComponent implements OnInit, OnDestroy {
   @ViewChild(CodeEditorComponent) editor!: CodeEditorComponent;
 
   SessionStatus = SessionStatus;
+  RunState = RunState;
   state!: SessionState;
   connected = false;
   submitting = false;
   showResults = false;
   showBroadcast = false;
-  mobileTab: 'challenge' | 'editor' | 'leaderboard' = 'editor';
+  mobileTab: 'challenge' | 'editor' | 'leaderboard' | 'terminal' = 'editor';
+
+  // Run state
+  isRunActive = false;
+  terminalVisible = false;
+
+  // Electron kiosk state
+  isElectron = false;
+  showMonitorWarning = false;
+  showExitConfirm = false;
+  exitSubmitting = false;
 
   private currentCode = '';
   private subs: Subscription[] = [];
@@ -540,8 +764,12 @@ export class CodingComponent implements OnInit, OnDestroy {
     private sessionService: SessionService,
     private signalr: SignalrService,
     private activityTracker: ActivityTrackerService,
-    private router: Router
-  ) {}
+    private kiosk: KioskService,
+    private router: Router,
+    public runState: RunStateService
+  ) {
+    this.isElectron = this.kiosk.isElectron;
+  }
 
   get challengeIndices(): number[] {
     return Array.from({ length: this.state.totalChallenges }, (_, i) => i);
@@ -598,6 +826,55 @@ export class CodingComponent implements OnInit, OnDestroy {
       })
     );
 
+    // Electron kiosk listeners
+    if (this.isElectron) {
+      this.kiosk.onMonitorWarning((show) => {
+        this.showMonitorWarning = show;
+      });
+
+      this.kiosk.onExitConfirmation(() => {
+        this.showExitConfirm = true;
+      });
+
+      this.kiosk.onSubmitAndExit(async () => {
+        this.exitSubmitting = true;
+        try {
+          // Submit current code for the active challenge
+          if (this.state.currentChallenge) {
+            await this.signalr.submitCode(
+              this.state.sessionCode,
+              this.state.currentChallenge.id,
+              this.currentCode
+            );
+          }
+        } catch (err) {
+          console.error('Final submission failed:', err);
+        }
+        // Signal to Electron that submission is done
+        await this.kiosk.submissionComplete();
+      });
+
+      this.kiosk.onSecurityViolation((data: any) => {
+        // Forward security events to the server via SignalR
+        if (data?.type && this.state?.sessionCode) {
+          this.signalr.logActivity(this.state.sessionCode, data.type, JSON.stringify(data));
+        }
+      });
+    }
+
+    // Track run state for button management
+    this.subs.push(
+      this.runState.state$.subscribe((rs) => {
+        this.isRunActive =
+          rs === RunState.Running ||
+          rs === RunState.WaitingForInput ||
+          rs === RunState.Compiling;
+        if (rs === RunState.Compiling) {
+          this.terminalVisible = true;
+        }
+      })
+    );
+
     // If no student session, redirect to join
     if (!this.state || this.state.studentId === 0) {
       this.router.navigate(['/join']);
@@ -607,6 +884,41 @@ export class CodingComponent implements OnInit, OnDestroy {
   onCodeChange(code: string): void {
     this.currentCode = code;
     this.activityTracker.updateCode(code);
+  }
+
+  async runCode(): Promise<void> {
+    if (this.isRunActive || !this.state.currentChallenge) return;
+
+    try {
+      await this.signalr.runCode(
+        this.state.sessionCode,
+        this.state.currentChallenge.id,
+        this.currentCode
+      );
+    } catch (err) {
+      console.error('Run failed:', err);
+    }
+  }
+
+  async stopRun(): Promise<void> {
+    try {
+      await this.signalr.stopRun(this.state.sessionCode);
+    } catch (err) {
+      console.error('Stop failed:', err);
+    }
+  }
+
+  onEditorKeydown(event: KeyboardEvent): void {
+    // Ctrl+Enter or Cmd+Enter → Run
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      this.runCode();
+    }
+    // Ctrl+Shift+Enter → Submit
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'Enter') {
+      event.preventDefault();
+      this.runTests();
+    }
   }
 
   async runTests(): Promise<void> {
@@ -626,6 +938,26 @@ export class CodingComponent implements OnInit, OnDestroy {
     } finally {
       this.submitting = false;
     }
+  }
+
+  // === Electron exit flow ===
+
+  requestExit(): void {
+    this.kiosk.exitKioskMode();
+  }
+
+  confirmExit(): void {
+    this.showExitConfirm = false;
+    this.kiosk.confirmExit();
+  }
+
+  cancelExit(): void {
+    this.showExitConfirm = false;
+    this.kiosk.cancelExit();
+  }
+
+  electronSessionEndExit(): void {
+    this.kiosk.sessionEndedExit();
   }
 
   ngOnDestroy(): void {

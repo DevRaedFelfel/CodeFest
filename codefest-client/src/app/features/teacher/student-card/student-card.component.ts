@@ -27,6 +27,18 @@ import { CommonModule } from '@angular/common';
         ></span>
       </div>
 
+      @if (runStatus) {
+        <div class="run-indicator" [class]="'run-' + runStatus" [attr.data-testid]="'student-card-' + student.displayName">
+          @if (runStatus === 'running') {
+            <span class="run-dot pulse-green"></span> Running...
+          } @else if (runStatus === 'waiting') {
+            <span class="run-dot pulse-blue"></span> Awaiting input...
+          } @else if (runStatus === 'compiling') {
+            <span class="run-dot pulse-yellow"></span> Compiling...
+          }
+        </div>
+      }
+
       <div class="card-body">
         <div class="progress-info">
           Challenge {{ student.currentChallengeIndex + 1 }} of {{ totalChallenges }}
@@ -170,6 +182,48 @@ import { CommonModule } from '@angular/common';
         background: rgba(255, 71, 87, 0.2);
         color: #ff4757;
       }
+
+      .run-indicator {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+
+      .run-running {
+        background: rgba(46, 213, 115, 0.12);
+        color: #2ed573;
+      }
+
+      .run-waiting {
+        background: rgba(79, 195, 247, 0.12);
+        color: #4fc3f7;
+      }
+
+      .run-compiling {
+        background: rgba(255, 215, 0, 0.12);
+        color: #ffd700;
+      }
+
+      .run-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        display: inline-block;
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+
+      .pulse-green { background: #2ed573; }
+      .pulse-blue { background: #4fc3f7; }
+      .pulse-yellow { background: #ffd700; }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
     `,
   ],
 })
@@ -177,5 +231,6 @@ export class StudentCardComponent {
   @Input() student: any = {};
   @Input() rank = 0;
   @Input() totalChallenges = 5;
+  @Input() runStatus: string | null = null;
   @Output() clicked = new EventEmitter<void>();
 }

@@ -13,6 +13,7 @@ import { StudentCardComponent } from '../student-card/student-card.component';
           [student]="student"
           [rank]="getRank(student)"
           [totalChallenges]="totalChallenges"
+          [runStatus]="runStatuses[student.id] || null"
           (clicked)="selectStudent.emit(student.id)"
         />
       } @empty {
@@ -52,6 +53,7 @@ import { StudentCardComponent } from '../student-card/student-card.component';
 export class StudentGridComponent {
   @Input() students: any[] = [];
   @Input() totalChallenges = 5;
+  @Input() runStatuses: Record<number, string> = {};
   @Output() selectStudent = new EventEmitter<number>();
 
   getRank(student: any): number {

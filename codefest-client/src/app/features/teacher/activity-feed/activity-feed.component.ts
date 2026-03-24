@@ -160,8 +160,10 @@ export class ActivityFeedComponent implements AfterViewChecked {
       'FullscreenExited',
       'Disconnected',
     ];
+    const runTypes = ['InteractiveRun', 'InteractiveRunInput', 'InteractiveRunStop'];
     if (successTypes.includes(type)) return 'success';
     if (warningTypes.includes(type)) return 'warning';
+    if (runTypes.includes(type)) return 'info';
     return 'info';
   }
 
@@ -176,6 +178,9 @@ export class ActivityFeedComponent implements AfterViewChecked {
       TabSwitched: 'switched tab',
       CopyPaste: 'paste detected',
       FullscreenExited: 'exited fullscreen',
+      InteractiveRun: 'started running code',
+      InteractiveRunInput: 'sent input to program',
+      InteractiveRunStop: 'stopped their run',
     };
     return descriptions[activity.activityType] ?? activity.activityType;
   }

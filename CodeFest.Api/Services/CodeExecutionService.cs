@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using CodeFest.Api.DTOs;
@@ -78,6 +79,78 @@ public class CodeExecutionService
         }
 
         return results;
+    }
+
+    public CompileResult Compile(string sourceCode)
+    {
+        var sw = Stopwatch.StartNew();
+
+        // Security check
+        foreach (var blocked in BlockedPatterns)
+        {
+            if (sourceCode.Contains(blocked))
+            {
+                sw.Stop();
+                return new CompileResult
+                {
+                    Success = false,
+                    CompileTimeMs = sw.ElapsedMilliseconds,
+                    Errors = new List<CompileError>
+                    {
+                        new() { Message = $"Blocked: use of '{blocked}' is not allowed.", Line = 0, Column = 0 }
+                    }
+                };
+            }
+        }
+
+        var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
+        var compilation = CSharpCompilation.Create(
+            assemblyName: "StudentRun_" + Guid.NewGuid().ToString("N"),
+            syntaxTrees: [syntaxTree],
+            references: References,
+            options: new CSharpCompilationOptions(OutputKind.ConsoleApplication)
+                .WithOptimizationLevel(OptimizationLevel.Release)
+                .WithAllowUnsafe(false));
+
+        using var ms = new MemoryStream();
+        var emitResult = compilation.Emit(ms);
+
+        if (!emitResult.Success)
+        {
+            sw.Stop();
+            var errors = emitResult.Diagnostics
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .Select(d =>
+                {
+                    var lineSpan = d.Location.GetLineSpan();
+                    return new CompileError
+                    {
+                        Message = d.GetMessage(),
+                        Line = lineSpan.StartLinePosition.Line + 1,
+                        Column = lineSpan.StartLinePosition.Character + 1,
+                        Severity = d.Severity.ToString()
+                    };
+                })
+                .ToList();
+
+            return new CompileResult
+            {
+                Success = false,
+                CompileTimeMs = sw.ElapsedMilliseconds,
+                Errors = errors
+            };
+        }
+
+        ms.Seek(0, SeekOrigin.Begin);
+        var assembly = Assembly.Load(ms.ToArray());
+
+        sw.Stop();
+        return new CompileResult
+        {
+            Success = true,
+            CompiledAssembly = assembly,
+            CompileTimeMs = sw.ElapsedMilliseconds
+        };
     }
 
     public SubmissionResult Execute(string code, Challenge challenge)

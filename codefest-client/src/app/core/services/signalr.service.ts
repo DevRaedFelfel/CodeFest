@@ -9,6 +9,8 @@ import { BehaviorSubject, Subject } from 'rxjs';
 import { Challenge } from '../models/challenge.model';
 import { SubmissionResult } from '../models/submission.model';
 import { LeaderboardEntry } from '../models/session.model';
+import { RunStateService } from './run-state.service';
+import { CompileError } from '../models/run-state.model';
 
 @Injectable({ providedIn: 'root' })
 export class SignalrService {
@@ -26,6 +28,12 @@ export class SignalrService {
   sessionStatusChanged$ = new Subject<string>();
   hintRequested$ = new Subject<any>();
 
+  // Teacher: interactive run events
+  studentRunStarted$ = new Subject<{ studentId: number; challengeId: number }>();
+  studentRunStopped$ = new Subject<number>();
+  studentRunFinished$ = new Subject<{ studentId: number; exitCode: number }>();
+  studentRunError$ = new Subject<{ studentId: number; error: string }>();
+
   // Student events
   sessionStarted$ = new Subject<Challenge>();
   sessionPaused$ = new Subject<void>();
@@ -41,7 +49,10 @@ export class SignalrService {
   sessionDeleted$ = new Subject<void>();
   sessionReopened$ = new Subject<void>();
 
-  constructor(private zone: NgZone) {}
+  constructor(
+    private zone: NgZone,
+    private runState: RunStateService
+  ) {}
 
   async connect(): Promise<void> {
     this.hubConnection = new HubConnectionBuilder()
@@ -118,6 +129,34 @@ export class SignalrService {
     on('HintRequested', (data: any) => this.hintRequested$.next(data));
     on('SessionDeleted', () => this.sessionDeleted$.next());
     on('SessionReopened', () => this.sessionReopened$.next());
+
+    // Interactive run handlers (student-side)
+    on('RunCompiling', () => this.runState.handleRunCompiling());
+    on('RunStarted', (runId: string) =>
+      this.runState.handleRunStarted(runId)
+    );
+    on('RunOutput', (text: string) => this.runState.handleRunOutput(text));
+    on('RunWaiting', () => this.runState.handleRunWaiting());
+    on('RunInputEcho', (text: string) =>
+      this.runState.handleRunInputEcho(text)
+    );
+    on('RunCompileError', (errors: CompileError[]) =>
+      this.runState.handleRunCompileError(errors)
+    );
+    on('RunError', (message: string) =>
+      this.runState.handleRunError(message)
+    );
+    on('RunFinished', (exitCode: number) =>
+      this.runState.handleRunFinished(exitCode)
+    );
+
+    // Interactive run handlers (teacher-side)
+    on('StudentRunStarted', (studentId: number, challengeId: number) =>
+      this.studentRunStarted$.next({ studentId, challengeId })
+    );
+    on('StudentRunStopped', (studentId: number) =>
+      this.studentRunStopped$.next(studentId)
+    );
   }
 
   async joinSession(
@@ -234,6 +273,35 @@ export class SignalrService {
       sessionCode,
       message
     );
+  }
+
+  // Interactive run methods
+  async runCode(
+    sessionCode: string,
+    challengeId: number,
+    code: string
+  ): Promise<void> {
+    return this.hubConnection.invoke(
+      'RunCode',
+      sessionCode,
+      challengeId,
+      code
+    );
+  }
+
+  async sendRunInput(
+    sessionCode: string,
+    input: string
+  ): Promise<void> {
+    return this.hubConnection.invoke(
+      'SendRunInput',
+      sessionCode,
+      input
+    );
+  }
+
+  async stopRun(sessionCode: string): Promise<void> {
+    return this.hubConnection.invoke('StopRun', sessionCode);
   }
 
   async disconnect(): Promise<void> {

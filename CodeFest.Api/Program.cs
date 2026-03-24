@@ -17,6 +17,7 @@ builder.Services.AddScoped<CodeExecutionService>();
 builder.Services.AddScoped<ChallengeService>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<ActivityLogService>();
+builder.Services.AddSingleton<InteractiveRunService>();
 
 // Controllers + SignalR
 builder.Services.AddControllers()
