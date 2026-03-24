@@ -246,53 +246,55 @@ function checkParseArgErrors(ctx: LintContext, symbols: SymbolTable): Diagnostic
 function checkReturnTypeMismatch(ctx: LintContext, symbols: SymbolTable): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
-  for (const [name, method] of symbols.methods) {
-    if (method.returnType === 'void') {
-      // CF141: void method returning a value
-      for (let i = method.declaredLine + 1; i < ctx.lines.length; i++) {
-        const line = ctx.lines[i];
-        const trimmed = line.trim();
-        if (trimmed === '}') break; // rough scope end
+  for (const [name, methods] of symbols.methods) {
+    for (const method of methods) {
+      if (method.returnType === 'void') {
+        // CF141: void method returning a value
+        for (let i = method.declaredLine + 1; i < ctx.lines.length; i++) {
+          const line = ctx.lines[i];
+          const trimmed = line.trim();
+          if (trimmed === '}') break; // rough scope end
 
-        const returnMatch = trimmed.match(/\breturn\s+(.+);/);
-        if (returnMatch) {
-          const returnPos = line.indexOf('return');
+          const returnMatch = trimmed.match(/\breturn\s+(.+);/);
+          if (returnMatch) {
+            const returnPos = line.indexOf('return');
+            diagnostics.push({
+              from: posOf(ctx, i, returnPos),
+              to: posOf(ctx, i, returnPos + returnMatch[0].length),
+              severity: 'error',
+              message: 'Cannot return a value from a `void` method.',
+              source: 'CodeFest [CF141]',
+            });
+          }
+        }
+      }
+
+      // CF142: Non-void method with no return
+      if (method.returnType !== 'void' && method.returnType !== 'Task') {
+        let hasReturn = false;
+        let braceDepth = 0;
+        let started = false;
+
+        for (let i = method.declaredLine; i < ctx.lines.length; i++) {
+          const line = ctx.lines[i];
+          if (line.includes('{')) { braceDepth++; started = true; }
+          if (line.includes('}')) { braceDepth--; if (started && braceDepth <= 0) break; }
+
+          if (/\breturn\b/.test(line)) {
+            hasReturn = true;
+            break;
+          }
+        }
+
+        if (!hasReturn && started) {
           diagnostics.push({
-            from: posOf(ctx, i, returnPos),
-            to: posOf(ctx, i, returnPos + returnMatch[0].length),
-            severity: 'error',
-            message: 'Cannot return a value from a `void` method.',
-            source: 'CodeFest [CF141]',
+            from: posOf(ctx, method.declaredLine, Math.max(0, ctx.lines[method.declaredLine].indexOf(name))),
+            to: posOf(ctx, method.declaredLine, Math.max(0, ctx.lines[method.declaredLine].indexOf(name)) + name.length),
+            severity: 'warning',
+            message: `Method \`${name}\` is declared to return \`${method.returnType}\` but has no \`return\` statement.`,
+            source: 'CodeFest [CF142]',
           });
         }
-      }
-    }
-
-    // CF142: Non-void method with no return
-    if (method.returnType !== 'void' && method.returnType !== 'Task') {
-      let hasReturn = false;
-      let braceDepth = 0;
-      let started = false;
-
-      for (let i = method.declaredLine; i < ctx.lines.length; i++) {
-        const line = ctx.lines[i];
-        if (line.includes('{')) { braceDepth++; started = true; }
-        if (line.includes('}')) { braceDepth--; if (started && braceDepth <= 0) break; }
-
-        if (/\breturn\b/.test(line)) {
-          hasReturn = true;
-          break;
-        }
-      }
-
-      if (!hasReturn && started) {
-        diagnostics.push({
-          from: posOf(ctx, method.declaredLine, Math.max(0, ctx.lines[method.declaredLine].indexOf(name))),
-          to: posOf(ctx, method.declaredLine, Math.max(0, ctx.lines[method.declaredLine].indexOf(name)) + name.length),
-          severity: 'warning',
-          message: `Method \`${name}\` is declared to return \`${method.returnType}\` but has no \`return\` statement.`,
-          source: 'CodeFest [CF142]',
-        });
       }
     }
   }

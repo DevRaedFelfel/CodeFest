@@ -21,7 +21,7 @@ export interface MethodInfo {
 /** Lightweight symbol table built from a single-file C# program. */
 export interface SymbolTable {
   variables: Map<string, VariableInfo>;
-  methods: Map<string, MethodInfo>;
+  methods: Map<string, MethodInfo[]>;
   currentClass: string | null;
 }
 
@@ -41,7 +41,7 @@ const FOREACH_VAR = /\bforeach\s*\(\s*(?:var|int|string|double|bool|char|decimal
  */
 export function buildSymbolTable(ctx: LintContext): SymbolTable {
   const variables = new Map<string, VariableInfo>();
-  const methods = new Map<string, MethodInfo>();
+  const methods = new Map<string, MethodInfo[]>();
   let currentClass: string | null = null;
 
   for (let i = 0; i < ctx.lines.length; i++) {
@@ -64,7 +64,13 @@ export function buildSymbolTable(ctx: LintContext): SymbolTable {
       const params = parseParams(paramStr);
       const isStatic = /\bstatic\b/.test(line);
 
-      methods.set(name, { name, returnType, params, isStatic, declaredLine: i });
+      const entry: MethodInfo = { name, returnType, params, isStatic, declaredLine: i };
+      const existing = methods.get(name);
+      if (existing) {
+        existing.push(entry);
+      } else {
+        methods.set(name, [entry]);
+      }
 
       // Register method parameters as variables
       for (const p of params) {

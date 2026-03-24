@@ -101,15 +101,15 @@ describe('symbol-table', () => {
       const ctx = makeCtx('static void Main(string[] args) { }');
       const st = buildSymbolTable(ctx);
       expect(st.methods.has('Main')).toBe(true);
-      expect(st.methods.get('Main')!.returnType).toBe('void');
-      expect(st.methods.get('Main')!.isStatic).toBe(true);
+      expect(st.methods.get('Main')![0].returnType).toBe('void');
+      expect(st.methods.get('Main')![0].isStatic).toBe(true);
     });
 
     it('should track method return type', () => {
       const ctx = makeCtx('int Add(int a, int b) { return a + b; }');
       const st = buildSymbolTable(ctx);
       expect(st.methods.has('Add')).toBe(true);
-      expect(st.methods.get('Add')!.returnType).toBe('int');
+      expect(st.methods.get('Add')![0].returnType).toBe('int');
     });
 
     it('should register method parameters as variables', () => {

@@ -28,22 +28,24 @@ function checkMainMethod(ctx: LintContext, symbols: SymbolTable): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const mainMethods: number[] = [];
 
-  for (const [name, method] of symbols.methods) {
-    if (name === 'Main') {
-      mainMethods.push(method.declaredLine);
+  for (const [name, methods] of symbols.methods) {
+    for (const method of methods) {
+      if (name === 'Main') {
+        mainMethods.push(method.declaredLine);
 
-      // CF210: Main without static
-      if (!method.isStatic) {
-        const line = ctx.lines[method.declaredLine];
-        const mainPos = line.indexOf('Main');
-        diagnostics.push({
-          from: posOf(ctx, method.declaredLine, mainPos),
-          to: posOf(ctx, method.declaredLine, mainPos + 4),
-          severity: 'error',
-          message: 'The `Main` method must be declared `static`.',
-          source: 'CodeFest [CF210]',
-          actions: [quickFixInsert('Add `static`', 'static ')],
-        });
+        // CF210: Main without static
+        if (!method.isStatic) {
+          const line = ctx.lines[method.declaredLine];
+          const mainPos = line.indexOf('Main');
+          diagnostics.push({
+            from: posOf(ctx, method.declaredLine, mainPos),
+            to: posOf(ctx, method.declaredLine, mainPos + 4),
+            severity: 'error',
+            message: 'The `Main` method must be declared `static`.',
+            source: 'CodeFest [CF210]',
+            actions: [quickFixInsert('Add `static`', 'static ')],
+          });
+        }
       }
     }
   }

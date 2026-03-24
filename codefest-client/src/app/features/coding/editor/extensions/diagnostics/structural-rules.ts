@@ -151,6 +151,9 @@ function checkMissingSemicolons(ctx: LintContext): Diagnostic[] {
       const isContinuation = CONTINUATION_STARTS.some(s => nextTrimmed.startsWith(s));
       if (isContinuation) continue;
 
+      // If next line starts with closing delimiter, this is the last arg in multi-line call — skip
+      if (/^[)\]]/.test(nextTrimmed)) continue;
+
       // Additional check: if line looks like a method declaration (has `{` on next line), skip
       if (nextTrimmed === '{') continue;
 
