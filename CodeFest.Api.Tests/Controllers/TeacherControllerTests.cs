@@ -1,21 +1,39 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using CodeFest.Api.Controllers;
+using CodeFest.Api.DTOs;
 using CodeFest.Api.Models;
 using CodeFest.Api.Services;
 using CodeFest.Api.Tests.Helpers;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CodeFest.Api.Tests.Controllers;
 
 public class TeacherControllerTests
 {
-    private (TeacherController controller, SessionService sessionService, ActivityLogService activityLogService) CreateController(string? dbName = null)
+    private (TeacherController controller, SessionService sessionService, ActivityLogService activityLogService) CreateController(string? dbName = null, int userId = 1, string role = "SuperAdmin")
     {
         dbName ??= Guid.NewGuid().ToString();
         var db = TestDbContextFactory.Create(dbName);
         var sessionService = new SessionService(db);
         var activityLogService = new ActivityLogService(db);
         var controller = new TeacherController(sessionService, activityLogService, db);
+
+        // Set up claims principal with sub and role claims
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new("role", role),
+        };
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = principal }
+        };
+
         return (controller, sessionService, activityLogService);
     }
 
@@ -31,8 +49,9 @@ public class TeacherControllerTests
         var result = await controller.GetSessions();
 
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-        var sessions = (okResult.Value as IEnumerable<object>)!.ToList();
-        sessions.Should().HaveCount(2);
+        var paginated = okResult.Value as PaginatedResponse<SessionListItem>;
+        paginated.Should().NotBeNull();
+        paginated!.Items.Should().HaveCount(2);
     }
 
     // --- CreateSession ---
@@ -107,6 +126,24 @@ public class TeacherControllerTests
         activities.Should().HaveCount(1);
     }
 
+    [Fact]
+    public async Task GetActivity_ShouldFilterByStudentId()
+    {
+        var (controller, sessionService, activityLogService) = CreateController();
+        var session = await sessionService.CreateAsync("Test", new List<int>(), "conn");
+        var s1 = await sessionService.JoinStudentAsync(session.Code, "Ali", "c1", StudentClientType.Web);
+        var s2 = await sessionService.JoinStudentAsync(session.Code, "Sara", "c2", StudentClientType.Web);
+        await activityLogService.LogAsync(s1.Id, session.Id, ActivityType.Joined);
+        await activityLogService.LogAsync(s2.Id, session.Id, ActivityType.Joined);
+        await activityLogService.LogAsync(s1.Id, session.Id, ActivityType.TabSwitched);
+
+        var result = await controller.GetActivity(session.Code, studentId: s1.Id);
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var activities = (okResult.Value as IEnumerable<object>)!.ToList();
+        activities.Should().HaveCount(2);
+    }
+
     // --- GetLeaderboard ---
 
     [Fact]
@@ -169,6 +206,13 @@ public class TeacherControllerTests
         var sessionService = new SessionService(db);
         var activityLogService = new ActivityLogService(db);
         var controller = new TeacherController(sessionService, activityLogService, db);
+
+        // Set up claims
+        var claims = new List<Claim> { new(JwtRegisteredClaimNames.Sub, "1"), new("role", "SuperAdmin") };
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) }
+        };
 
         // Create challenge first
         var challenge = new Challenge { Title = "Test", Description = "d", StarterCode = "c", Order = 1 };
@@ -320,5 +364,37 @@ public class TeacherControllerTests
         var result = await controller.UpdateStatus(session.Code, new UpdateStatusRequest { Status = "reopen" });
 
         result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    // --- Bulk Operations ---
+
+    [Fact]
+    public async Task BulkEndSessions_ShouldEndActiveAndPausedSessions()
+    {
+        var (controller, sessionService, _) = CreateController();
+        var s1 = await sessionService.CreateAsync("Active Session", new List<int>(), "conn");
+        await sessionService.StartAsync(s1.Code);
+        var s2 = await sessionService.CreateAsync("Lobby Session", new List<int>(), "conn");
+
+        var result = await controller.BulkEndSessions(new BulkSessionRequest(new List<string> { s1.Code, s2.Code }));
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var ended = okResult.Value!.GetType().GetProperty("ended")!.GetValue(okResult.Value);
+        ended.Should().Be(1); // Only the active one
+    }
+
+    [Fact]
+    public async Task BulkDeleteSessions_ShouldDeleteLobbyAndEndedOnly()
+    {
+        var (controller, sessionService, _) = CreateController();
+        var s1 = await sessionService.CreateAsync("Lobby Session", new List<int>(), "conn");
+        var s2 = await sessionService.CreateAsync("Active Session", new List<int>(), "conn");
+        await sessionService.StartAsync(s2.Code);
+
+        var result = await controller.BulkDeleteSessions(new BulkSessionRequest(new List<string> { s1.Code, s2.Code }));
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        var deleted = okResult.Value!.GetType().GetProperty("deleted")!.GetValue(okResult.Value);
+        deleted.Should().Be(1); // Only the lobby one
     }
 }

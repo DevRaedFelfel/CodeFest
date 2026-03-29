@@ -1,0 +1,24 @@
+appId: com.codefest.exam
+productName: CodeFest Exam
+directories:
+  output: installer
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: assets/icon.ico
+  requestedExecutionLevel: asInvoker
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  deleteAppDataOnUninstall: true
+files:
+  - dist/**/*
+  - assets/**/*
+  - "!src/**/*"
+  - "!scripts/**/*"
+  - "!node_modules/.cache/**/*"
+extraResources:
+  - from: assets/
+    to: assets/

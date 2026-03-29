@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { SignalrService } from '../../core/services/signalr.service';
 import { TeacherService } from '../../core/services/teacher.service';
@@ -417,11 +418,26 @@ export class TeacherComponent implements OnInit, OnDestroy {
 
   constructor(
     private teacherService: TeacherService,
-    private signalr: SignalrService
+    private signalr: SignalrService,
+    private route: ActivatedRoute,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
     this.teacherService.loadSessions();
+
+    // If route has :code param, auto-select that session
+    const code = this.route.snapshot.paramMap.get('code');
+    if (code) {
+      this.teacherService.sessions$.subscribe((sessions) => {
+        if (sessions.length > 0 && !this.currentSession) {
+          const match = sessions.find((s) => s.code === code);
+          if (match) {
+            this.selectSession(match);
+          }
+        }
+      });
+    }
 
     this.subs.push(
       this.teacherService.sessions$.subscribe((s) => (this.sessions = s)),
@@ -589,5 +605,6 @@ export class TeacherComponent implements OnInit, OnDestroy {
   backToList(): void {
     this.teacherService.clearSession();
     this.closeViewer();
+    this.router.navigate(['/teacher/sessions']);
   }
 }

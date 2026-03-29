@@ -12,6 +12,16 @@ public class Session
     public string TeacherConnectionId { get; set; } = string.Empty;
     public List<int> ChallengeIds { get; set; } = new();
     public List<Student> Students { get; set; } = new();
+
+    // --- NEW FIELDS ---
+    public int? CourseId { get; set; }
+    public Course? Course { get; set; }
+    public int? CreatedByUserId { get; set; }
+    public User? CreatedBy { get; set; }
+    public string? ShareableLink { get; set; }
+    public string? QrCodeData { get; set; }
+
+    public List<SessionParticipant> Participants { get; set; } = new();
 }
 
 public enum SessionStatus { Lobby, Active, Paused, Ended }

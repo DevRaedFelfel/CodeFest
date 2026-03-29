@@ -14,4 +14,4 @@ public class Student
     public StudentClientType ClientType { get; set; }
 }
 
-public enum StudentClientType { Web, Android }
+public enum StudentClientType { Web, Android, iOS, WindowsElectron }

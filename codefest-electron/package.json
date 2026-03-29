@@ -1,0 +1,18 @@
+{
+  "name": "codefest-exam",
+  "version": "1.0.0",
+  "description": "CodeFest Secure Exam Client for Windows",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "tsc && electron . --server-url=http://localhost:4200",
+    "build": "tsc && electron-builder --win",
+    "build:dir": "tsc && electron-builder --win --dir",
+    "compile": "tsc",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.0.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -11,6 +11,7 @@ import { SubmissionResult } from '../models/submission.model';
 import { LeaderboardEntry } from '../models/session.model';
 import { RunStateService } from './run-state.service';
 import { CompileError } from '../models/run-state.model';
+import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class SignalrService {
@@ -59,12 +60,15 @@ export class SignalrService {
 
   constructor(
     private zone: NgZone,
-    private runState: RunStateService
+    private runState: RunStateService,
+    private authService: AuthService
   ) {}
 
   async connect(): Promise<void> {
     this.hubConnection = new HubConnectionBuilder()
-      .withUrl(this.baseUrl)
+      .withUrl(this.baseUrl, {
+        accessTokenFactory: () => this.authService.getToken() || '',
+      })
       .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
       .configureLogging(LogLevel.Information)
       .build();

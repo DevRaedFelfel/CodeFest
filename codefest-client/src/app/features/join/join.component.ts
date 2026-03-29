@@ -1,10 +1,11 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { SignalrService } from '../../core/services/signalr.service';
 import { SessionService } from '../../core/services/session.service';
 import { KioskService } from '../../core/services/kiosk.service';
+import { AuthService } from '../../core/services/auth.service';
 import { SessionStatus } from '../../core/models/session.model';
 
 @Component({
@@ -171,7 +172,7 @@ import { SessionStatus } from '../../core/models/session.model';
     `,
   ],
 })
-export class JoinComponent {
+export class JoinComponent implements OnInit {
   sessionCode = '';
   displayName = '';
   joining = false;
@@ -181,8 +182,23 @@ export class JoinComponent {
     private signalr: SignalrService,
     private session: SessionService,
     private kiosk: KioskService,
-    private router: Router
+    private auth: AuthService,
+    private router: Router,
+    private route: ActivatedRoute
   ) {}
+
+  ngOnInit(): void {
+    // Pre-fill from route param /join/:code
+    const code = this.route.snapshot.paramMap.get('code');
+    if (code) {
+      this.sessionCode = code.toUpperCase();
+    }
+
+    // Pre-fill display name from auth if available
+    if (this.auth.currentUser) {
+      this.displayName = this.auth.currentUser.name;
+    }
+  }
 
   get canJoin(): boolean {
     return this.sessionCode.length >= 3 && this.displayName.trim().length >= 1;
@@ -207,6 +223,18 @@ export class JoinComponent {
       );
 
       console.log('JoinSession result:', JSON.stringify(result, null, 2));
+
+      // Check for enrollment error
+      if (result?.error === 'NOT_ENROLLED') {
+        this.router.navigate(['/not-enrolled'], {
+          state: {
+            courseId: result.courseId,
+            courseCode: result.courseCode,
+            courseName: result.courseName,
+          },
+        });
+        return;
+      }
 
       // Map session status string to enum
       const statusMap: Record<string, SessionStatus> = {

@@ -12,6 +12,10 @@ public class Challenge
     public DifficultyLevel Difficulty { get; set; }
     public List<TestCase> TestCases { get; set; } = new();
     public List<CodePatternCheck> PatternChecks { get; set; } = new();
+
+    // --- NEW FIELD ---
+    public int? CourseId { get; set; }
+    public Course? Course { get; set; }
 }
 
 public enum DifficultyLevel { Easy, Medium, Hard, Boss }

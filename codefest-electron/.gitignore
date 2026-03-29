@@ -1,0 +1,7 @@
+node_modules/
+dist/
+installer/
+src/renderer/
+*.keystore
+keystore.properties
+codefest-config.json

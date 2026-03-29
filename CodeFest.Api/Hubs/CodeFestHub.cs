@@ -1,9 +1,14 @@
+using System.IdentityModel.Tokens.Jwt;
+using CodeFest.Api.Data;
 using CodeFest.Api.Models;
 using CodeFest.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace CodeFest.Api.Hubs;
 
+[Authorize(Policy = "Authenticated")]
 public class CodeFestHub : Hub
 {
     private readonly SessionService _sessionService;
@@ -11,19 +16,39 @@ public class CodeFestHub : Hub
     private readonly ActivityLogService _activityLog;
     private readonly CodeExecutionService _executor;
     private readonly InteractiveRunService _interactiveRunService;
+    private readonly CodeFestDbContext _db;
 
     public CodeFestHub(
         SessionService sessionService,
         ChallengeService challengeService,
         ActivityLogService activityLog,
         CodeExecutionService executor,
-        InteractiveRunService interactiveRunService)
+        InteractiveRunService interactiveRunService,
+        CodeFestDbContext db)
     {
         _sessionService = sessionService;
         _challengeService = challengeService;
         _activityLog = activityLog;
         _executor = executor;
         _interactiveRunService = interactiveRunService;
+        _db = db;
+    }
+
+    private int GetUserId()
+    {
+        var claim = Context.User?.FindFirst(JwtRegisteredClaimNames.Sub)
+            ?? Context.User?.FindFirst("sub");
+        return claim != null ? int.Parse(claim.Value) : 0;
+    }
+
+    private string GetUserRole()
+    {
+        return Context.User?.FindFirst("role")?.Value ?? "";
+    }
+
+    private string GetUserName()
+    {
+        return Context.User?.FindFirst("name")?.Value ?? "Unknown";
     }
 
     // --- Teacher Actions ---
@@ -40,6 +65,49 @@ public class CodeFestHub : Hub
         return new { session.Code, session.Name, session.Status };
     }
 
+    // New overload: course-scoped session creation
+    public async Task<object> CreateCourseSession(string sessionName, int courseId, List<int> challengeIds)
+    {
+        var userId = GetUserId();
+        var role = GetUserRole();
+
+        // Verify instructor owns the course or is super admin
+        var course = await _db.Courses.FindAsync(courseId);
+        if (course == null || (course.InstructorId != userId && role != "SuperAdmin"))
+        {
+            throw new HubException("You do not have access to this course.");
+        }
+
+        var session = await _sessionService.CreateAsync(sessionName, challengeIds, Context.ConnectionId);
+
+        // Set course binding
+        var sessionEntity = await _db.Sessions.FirstOrDefaultAsync(s => s.Code == session.Code);
+        if (sessionEntity != null)
+        {
+            sessionEntity.CourseId = courseId;
+            sessionEntity.CreatedByUserId = userId;
+
+            // Generate shareable link and QR
+            var qrService = Context.GetHttpContext()?.RequestServices.GetService<QrCodeService>();
+            if (qrService != null)
+            {
+                sessionEntity.ShareableLink = qrService.GenerateShareableLink(session.Code);
+                sessionEntity.QrCodeData = qrService.GenerateQrCodeBase64(sessionEntity.ShareableLink);
+            }
+
+            await _db.SaveChangesAsync();
+        }
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"teacher-{session.Code}");
+        return new
+        {
+            session.Code, session.Name, session.Status,
+            courseId,
+            shareableLink = sessionEntity?.ShareableLink,
+            qrCodeBase64 = sessionEntity?.QrCodeData
+        };
+    }
+
     public async Task StartSession(string sessionCode)
     {
         var session = await _sessionService.StartAsync(sessionCode);
@@ -50,7 +118,6 @@ public class CodeFestHub : Hub
             var challenge = await _challengeService.GetByIdAsync(session.ChallengeIds[0]);
             if (challenge != null)
             {
-                // Send challenge but exclude hidden test details
                 var clientChallenge = new
                 {
                     challenge.Id,
@@ -135,7 +202,6 @@ public class CodeFestHub : Hub
         var session = await _sessionService.GetByCodeAsync(sessionCode);
         if (session == null) return;
 
-        // This broadcasts to all students to advance to next challenge
         await Clients.Group($"session-{sessionCode}").SendAsync("UnlockNextChallenge");
     }
 
@@ -144,6 +210,39 @@ public class CodeFestHub : Hub
     public async Task<object?> JoinSession(string sessionCode, string displayName, string clientType)
     {
         var ct = Enum.TryParse<StudentClientType>(clientType, true, out var parsed) ? parsed : StudentClientType.Web;
+        var userId = GetUserId();
+
+        // If user is authenticated, check enrollment for course-bound sessions
+        if (userId > 0)
+        {
+            var session = await _sessionService.GetByCodeAsync(sessionCode);
+            if (session?.CourseId != null)
+            {
+                var enrolled = await _db.Enrollments.AnyAsync(e =>
+                    e.StudentId == userId && e.CourseId == session.CourseId && e.Status == EnrollmentStatus.Active);
+
+                // Allow instructors and super admins to join without enrollment
+                var role = GetUserRole();
+                if (!enrolled && role != "Instructor" && role != "SuperAdmin")
+                {
+                    var course = await _db.Courses.FindAsync(session.CourseId);
+                    return new
+                    {
+                        error = "NOT_ENROLLED",
+                        courseId = course?.Id,
+                        courseName = course?.Name,
+                        courseCode = course?.Code
+                    };
+                }
+            }
+
+            // Use authenticated user's display name
+            var user = await _db.Users.FindAsync(userId);
+            if (user != null)
+            {
+                displayName = user.DisplayName;
+            }
+        }
 
         try
         {
@@ -151,6 +250,35 @@ public class CodeFestHub : Hub
             await Groups.AddToGroupAsync(Context.ConnectionId, $"session-{sessionCode}");
 
             await _activityLog.LogAsync(student.Id, student.SessionId, ActivityType.Joined);
+
+            // Also create a SessionParticipant record if authenticated
+            if (userId > 0)
+            {
+                var existingParticipant = await _db.SessionParticipants
+                    .FirstOrDefaultAsync(sp => sp.SessionId == student.SessionId && sp.UserId == userId);
+
+                if (existingParticipant == null)
+                {
+                    _db.SessionParticipants.Add(new SessionParticipant
+                    {
+                        SessionId = student.SessionId,
+                        UserId = userId,
+                        ConnectionId = Context.ConnectionId,
+                        CurrentChallengeIndex = 0,
+                        TotalPoints = 0,
+                        JoinedAt = DateTime.UtcNow,
+                        IsConnected = true,
+                        ClientType = ct
+                    });
+                    await _db.SaveChangesAsync();
+                }
+                else
+                {
+                    existingParticipant.ConnectionId = Context.ConnectionId;
+                    existingParticipant.IsConnected = true;
+                    await _db.SaveChangesAsync();
+                }
+            }
 
             // Notify teacher
             await Clients.Group($"teacher-{sessionCode}").SendAsync("StudentJoined", new
@@ -220,26 +348,6 @@ public class CodeFestHub : Hub
         await _activityLog.LogAsync(student.Id, student.SessionId, ActivityType.SubmissionAttempt);
 
         var result = await _challengeService.RunTests(challengeId, code);
-
-        // Save submission
-        var submission = new Submission
-        {
-            StudentId = student.Id,
-            ChallengeId = challengeId,
-            SessionId = student.SessionId,
-            Code = code,
-            TestsPassed = result.TestsPassed,
-            TestsTotal = result.TestsTotal,
-            AllPassed = result.AllPassed,
-            PointsAwarded = result.PointsAwarded,
-            CompileError = result.CompileError,
-            RuntimeError = result.RuntimeError,
-            ExecutionTimeMs = result.ExecutionTimeMs,
-            SubmittedAt = DateTime.UtcNow
-        };
-
-        // We need DbContext access — inject it or use service
-        // For now, let the challenge service handle it
 
         // Send results to student
         await Clients.Caller.SendAsync("TestResults", result);
@@ -423,6 +531,19 @@ public class CodeFestHub : Hub
             if (session != null)
             {
                 await Clients.Group($"teacher-{session.Code}").SendAsync("StudentDisconnected", student.Id);
+            }
+        }
+
+        // Also update SessionParticipant
+        var userId = GetUserId();
+        if (userId > 0)
+        {
+            var participant = await _db.SessionParticipants
+                .FirstOrDefaultAsync(sp => sp.ConnectionId == Context.ConnectionId);
+            if (participant != null)
+            {
+                participant.IsConnected = false;
+                await _db.SaveChangesAsync();
             }
         }
 

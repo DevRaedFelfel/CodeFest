@@ -92,7 +92,8 @@ import { SignalrService } from '../../../core/services/signalr.service';
       }
 
       .message-input:focus {
-        border-color: #7b2ff7;
+        border-color: var(--primary-color, #1976d2);
+        box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
       }
 
       .message-input::placeholder {
@@ -123,7 +124,8 @@ import { SignalrService } from '../../../core/services/signalr.service';
       }
 
       .challenge-input:focus {
-        border-color: #7b2ff7;
+        border-color: var(--primary-color, #1976d2);
+        box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
       }
 
       .hint-input {
@@ -138,7 +140,8 @@ import { SignalrService } from '../../../core/services/signalr.service';
       }
 
       .hint-input:focus {
-        border-color: #7b2ff7;
+        border-color: var(--primary-color, #1976d2);
+        box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
       }
 
       .hint-input::placeholder,
@@ -164,13 +167,25 @@ import { SignalrService } from '../../../core/services/signalr.service';
       }
 
       .btn-broadcast {
-        background: linear-gradient(90deg, #7b2ff7, #00d2ff);
+        background: var(--primary-color, #1976d2);
+        color: #ffffff;
+        border: 1px solid var(--primary-color, #1976d2);
+        box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.25);
+      }
+
+      .btn-broadcast:hover:not(:disabled) {
+        background: #1565c0;
+        border-color: #1565c0;
       }
 
       .btn-hint {
         background: rgba(255, 165, 2, 0.4);
         border: 1px solid rgba(255, 165, 2, 0.5);
         color: #ffa502;
+      }
+
+      .btn-hint:hover:not(:disabled) {
+        background: rgba(255, 165, 2, 0.6);
       }
 
       .success {

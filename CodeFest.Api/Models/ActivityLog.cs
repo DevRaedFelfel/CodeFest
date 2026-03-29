@@ -5,6 +5,8 @@ public class ActivityLog
     public int Id { get; set; }
     public int StudentId { get; set; }
     public Student Student { get; set; } = null!;
+    public int? UserId { get; set; }
+    public User? User { get; set; }
     public int SessionId { get; set; }
     public Session Session { get; set; } = null!;
     public ActivityType Type { get; set; }

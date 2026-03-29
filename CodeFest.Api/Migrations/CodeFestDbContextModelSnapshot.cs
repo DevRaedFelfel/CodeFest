@@ -22,6 +22,39 @@ namespace CodeFest.Api.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("CodeFest.Api.Models.AcademicLoad", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("InstructorId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Term")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId");
+
+                    b.HasIndex("InstructorId", "CourseId")
+                        .IsUnique();
+
+                    b.ToTable("AcademicLoads");
+                });
+
             modelBuilder.Entity("CodeFest.Api.Models.ActivityLog", b =>
                 {
                     b.Property<int>("Id")
@@ -45,11 +78,16 @@ namespace CodeFest.Api.Migrations
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("SessionId");
 
                     b.HasIndex("StudentId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("ActivityLogs");
                 });
@@ -61,6 +99,9 @@ namespace CodeFest.Api.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CourseId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -87,6 +128,8 @@ namespace CodeFest.Api.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CourseId");
 
                     b.ToTable("Challenges");
                 });
@@ -123,6 +166,109 @@ namespace CodeFest.Api.Migrations
                     b.ToTable("CodePatternChecks");
                 });
 
+            modelBuilder.Entity("CodeFest.Api.Models.Course", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<int>("InstructorId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("InstructorId");
+
+                    b.ToTable("Courses");
+                });
+
+            modelBuilder.Entity("CodeFest.Api.Models.Enrollment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("EnrolledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId");
+
+                    b.HasIndex("StudentId", "CourseId")
+                        .IsUnique();
+
+                    b.ToTable("Enrollments");
+                });
+
+            modelBuilder.Entity("CodeFest.Api.Models.EnrollmentRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ReviewedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StudentUserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId");
+
+                    b.HasIndex("StudentUserId");
+
+                    b.ToTable("EnrollmentRequests");
+                });
+
             modelBuilder.Entity("CodeFest.Api.Models.Session", b =>
                 {
                     b.Property<int>("Id")
@@ -139,14 +285,26 @@ namespace CodeFest.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("CourseId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("QrCodeData")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ShareableLink")
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("StartedAt")
@@ -164,7 +322,54 @@ namespace CodeFest.Api.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
+                    b.HasIndex("CourseId");
+
+                    b.HasIndex("CreatedByUserId");
+
                     b.ToTable("Sessions");
+                });
+
+            modelBuilder.Entity("CodeFest.Api.Models.SessionParticipant", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ClientType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ConnectionId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("CurrentChallengeIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsConnected")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SessionId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalPoints")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("SessionId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("SessionParticipants");
                 });
 
             modelBuilder.Entity("CodeFest.Api.Models.Student", b =>
@@ -256,6 +461,9 @@ namespace CodeFest.Api.Migrations
                     b.Property<int>("TestsTotal")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ChallengeId");
@@ -263,6 +471,8 @@ namespace CodeFest.Api.Migrations
                     b.HasIndex("SessionId");
 
                     b.HasIndex("StudentId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Submissions");
                 });
@@ -302,6 +512,64 @@ namespace CodeFest.Api.Migrations
                     b.ToTable("TestCases");
                 });
 
+            modelBuilder.Entity("CodeFest.Api.Models.User", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PictureUrl")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("CodeFest.Api.Models.AcademicLoad", b =>
+                {
+                    b.HasOne("CodeFest.Api.Models.Course", "Course")
+                        .WithMany()
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CodeFest.Api.Models.User", "Instructor")
+                        .WithMany()
+                        .HasForeignKey("InstructorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Course");
+
+                    b.Navigation("Instructor");
+                });
+
             modelBuilder.Entity("CodeFest.Api.Models.ActivityLog", b =>
                 {
                     b.HasOne("CodeFest.Api.Models.Session", "Session")
@@ -316,9 +584,26 @@ namespace CodeFest.Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("CodeFest.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Session");
 
                     b.Navigation("Student");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CodeFest.Api.Models.Challenge", b =>
+                {
+                    b.HasOne("CodeFest.Api.Models.Course", "Course")
+                        .WithMany("Challenges")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Course");
                 });
 
             modelBuilder.Entity("CodeFest.Api.Models.CodePatternCheck", b =>
@@ -330,6 +615,91 @@ namespace CodeFest.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Challenge");
+                });
+
+            modelBuilder.Entity("CodeFest.Api.Models.Course", b =>
+                {
+                    b.HasOne("CodeFest.Api.Models.User", "Instructor")
+                        .WithMany()
+                        .HasForeignKey("InstructorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Instructor");
+                });
+
+            modelBuilder.Entity("CodeFest.Api.Models.Enrollment", b =>
+                {
+                    b.HasOne("CodeFest.Api.Models.Course", "Course")
+                        .WithMany("Enrollments")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CodeFest.Api.Models.User", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Course");
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("CodeFest.Api.Models.EnrollmentRequest", b =>
+                {
+                    b.HasOne("CodeFest.Api.Models.Course", "Course")
+                        .WithMany()
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CodeFest.Api.Models.User", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Course");
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("CodeFest.Api.Models.Session", b =>
+                {
+                    b.HasOne("CodeFest.Api.Models.Course", "Course")
+                        .WithMany("Sessions")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("CodeFest.Api.Models.User", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Course");
+
+                    b.Navigation("CreatedBy");
+                });
+
+            modelBuilder.Entity("CodeFest.Api.Models.SessionParticipant", b =>
+                {
+                    b.HasOne("CodeFest.Api.Models.Session", "Session")
+                        .WithMany("Participants")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CodeFest.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Session");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("CodeFest.Api.Models.Student", b =>
@@ -363,11 +733,18 @@ namespace CodeFest.Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("CodeFest.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Challenge");
 
                     b.Navigation("Session");
 
                     b.Navigation("Student");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("CodeFest.Api.Models.TestCase", b =>
@@ -388,8 +765,19 @@ namespace CodeFest.Api.Migrations
                     b.Navigation("TestCases");
                 });
 
+            modelBuilder.Entity("CodeFest.Api.Models.Course", b =>
+                {
+                    b.Navigation("Challenges");
+
+                    b.Navigation("Enrollments");
+
+                    b.Navigation("Sessions");
+                });
+
             modelBuilder.Entity("CodeFest.Api.Models.Session", b =>
                 {
+                    b.Navigation("Participants");
+
                     b.Navigation("Students");
                 });
 #pragma warning restore 612, 618

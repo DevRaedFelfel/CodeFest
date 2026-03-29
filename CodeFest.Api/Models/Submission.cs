@@ -5,6 +5,8 @@ public class Submission
     public int Id { get; set; }
     public int StudentId { get; set; }
     public Student Student { get; set; } = null!;
+    public int? UserId { get; set; }
+    public User? User { get; set; }
     public int ChallengeId { get; set; }
     public Challenge Challenge { get; set; } = null!;
     public int SessionId { get; set; }
